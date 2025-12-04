@@ -130,7 +130,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
           padding: const EdgeInsets.all(8.0),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.sports_tennis, size: 24),
@@ -139,18 +139,13 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: ASSpacing.md),
-            child: GestureDetector(
+            child: ASAvatar(
+              imageUrl: currentUser?.avatarUrl,
+              name: currentUser?.fullName ?? 'P',
+              size: ASAvatarSize.sm,
+              showBorder: true,
               onTap: _showProfileMenu,
-              child: CircleAvatar(
-                backgroundColor: Colors.white.withOpacity(0.3),
-                child: Text(
-                  currentUser?.fullName.substring(0, 1) ?? 'P',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              animate: true,
             ),
           ).animate().scale(
                 delay: ASAnimations.fast,
@@ -170,24 +165,27 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
               _buildGreetingSection(isDark),
 
               // 孩子出勤概览
-              const ASSectionTitle(title: '📊 出勤概览 Attendance Overview')
-                  .animate()
-                  .fadeIn(duration: ASAnimations.normal, delay: 100.ms)
-                  .slideX(begin: -0.1, end: 0),
+              ASSectionTitle(
+                title: '📊 出勤概览 Attendance Overview',
+                animate: true,
+                animationDelay: 100.ms,
+              ),
               _buildChildrenAttendanceSection(isDark),
 
               // 训练精彩时刻
-              const ASSectionTitle(title: '🎬 训练精彩 Training Moments')
-                  .animate()
-                  .fadeIn(duration: ASAnimations.normal, delay: 200.ms)
-                  .slideX(begin: -0.1, end: 0),
+              ASSectionTitle(
+                title: '🎬 训练精彩 Training Moments',
+                animate: true,
+                animationDelay: 200.ms,
+              ),
               _buildMomentsSection(isDark),
 
               // 公告
-              const ASSectionTitle(title: '📢 通知 Notices')
-                  .animate()
-                  .fadeIn(duration: ASAnimations.normal, delay: 300.ms)
-                  .slideX(begin: -0.1, end: 0),
+              ASSectionTitle(
+                title: '📢 通知 Notices',
+                animate: true,
+                animationDelay: 300.ms,
+              ),
               _buildNoticesSection(isDark),
 
               const SizedBox(height: ASSpacing.xxl),
@@ -199,29 +197,31 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
   }
 
   void _showProfileMenu() {
-    showModalBottomSheet(
+    ASBottomSheet.show(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('个人资料'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: ASColors.error),
-              title: const Text('退出登录', style: TextStyle(color: ASColors.error)),
-              onTap: () {
-                Navigator.pop(context);
-                ref.read(supabaseAuthRepositoryProvider).signOut();
-                ref.read(currentUserProvider.notifier).setUser(null);
-                context.go('/login');
-              },
-            ),
-          ],
-        ),
+      title: '个人中心',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('个人资料'),
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/profile');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout, color: ASColors.error),
+            title: const Text('退出登录', style: TextStyle(color: ASColors.error)),
+            onTap: () {
+              Navigator.pop(context);
+              ref.read(supabaseAuthRepositoryProvider).signOut();
+              ref.read(currentUserProvider.notifier).setUser(null);
+              context.go('/login');
+            },
+          ),
+        ],
       ),
     );
   }
@@ -232,24 +232,22 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
 
     return Padding(
       padding: const EdgeInsets.all(ASSpacing.pagePadding),
-      child: ASCard(
-        animate: true,
+      child: ASGlassContainer.adaptive(
+        padding: const EdgeInsets.all(ASSpacing.cardPadding),
+        blur: isDark ? ASColors.glassBlurSigma : ASColors.glassBlurSigmaLight,
+        opacity: 0.9,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: ASColors.primary.withValues(alpha: 0.1),
-                  child: Text(
-                    currentUser?.fullName.substring(0, 1) ?? 'P',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: ASColors.primary,
-                    ),
-                  ),
+                ASAvatar(
+                  name: currentUser?.fullName ?? 'Parent',
+                  size: ASAvatarSize.lg,
+                  showBorder: true,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                  animate: true,
                 ),
                 const SizedBox(width: ASSpacing.md),
                 Expanded(
@@ -258,10 +256,9 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
                     children: [
                       Text(
                         'Hi, ${currentUser?.fullName ?? 'Parent'}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
                       const SizedBox(height: ASSpacing.xs),
                       Text(
@@ -273,16 +270,24 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
                     ],
                   ),
                 ),
+                FilledButton.icon(
+                  onPressed: _showAddChildDialog,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('添加孩子'),
+                ),
               ],
             ),
             if (_children.isNotEmpty) ...[
               const SizedBox(height: ASSpacing.md),
               Wrap(
                 spacing: ASSpacing.sm,
-                children: _children.map((child) => ASTag(
-                  label: child.fullName,
-                  type: ASTagType.primary,
-                )).toList(),
+                runSpacing: ASSpacing.sm,
+                children: _children
+                    .map((child) => ASTag(
+                          label: child.fullName,
+                          type: ASTagType.primary,
+                        ))
+                    .toList(),
               ),
             ],
           ],
@@ -304,7 +309,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
             2,
             (index) => Padding(
               padding: const EdgeInsets.only(bottom: ASSpacing.md),
-              child: ASSkeletonListItem(hasAvatar: true),
+              child: const ASSkeletonProfileCard(),
             ),
           ),
         ),
@@ -314,33 +319,13 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
     if (_children.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding),
-        child: ASCard(
-          animate: true,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(ASSpacing.xl),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.child_care,
-                    size: 48,
-                    color: hintColor,
-                  ),
-                  const SizedBox(height: ASSpacing.md),
-                  Text(
-                    '暂无关联的学员',
-                    style: TextStyle(color: secondaryColor),
-                  ),
-                  const SizedBox(height: ASSpacing.md),
-                  ASPrimaryButton(
-                    label: '添加孩子',
-                    icon: Icons.person_add,
-                    onPressed: _showAddChildDialog,
-                  ),
-                ],
-              ),
-            ),
-          ),
+        child: ASEmptyState(
+          type: ASEmptyStateType.noData,
+          title: '暂无关联的学员',
+          description: '请添加孩子后查看出勤与课时信息',
+          icon: Icons.child_care,
+          actionLabel: '添加孩子',
+          onAction: _showAddChildDialog,
         ),
       );
     }
@@ -377,7 +362,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
               itemBuilder: (context, index) => Container(
                 width: 160,
                 margin: const EdgeInsets.only(right: ASSpacing.md),
-                child: const ASSkeletonCard(height: 180),
+                child: const ASSkeletonImage(height: 180),
               ),
             ),
           );
@@ -387,27 +372,11 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
         if (posts.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding),
-            child: ASCard(
-              animate: true,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(ASSpacing.xl),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.video_library_outlined,
-                        size: 48,
-                        color: hintColor,
-                      ),
-                      const SizedBox(height: ASSpacing.md),
-                      Text(
-                        '暂无训练精彩时刻',
-                        style: TextStyle(color: secondaryColor),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            child: ASEmptyState(
+              type: ASEmptyStateType.noData,
+              title: '暂无训练精彩时刻',
+              description: '关注孩子的每一次突破，这里会展示最新动态',
+              icon: Icons.video_library_outlined,
             ),
           );
         }
@@ -441,7 +410,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
                 3,
                 (index) => Padding(
                   padding: const EdgeInsets.only(bottom: ASSpacing.md),
-                  child: ASSkeletonListItem(hasAvatar: true, lines: 2),
+                  child: const ASSkeletonNoticeCard(),
                 ),
               ),
             ),
@@ -452,9 +421,11 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
         if (notices.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(ASSpacing.lg),
-            child: const Text('暂无公告')
-                .animate()
-                .fadeIn(duration: ASAnimations.normal),
+            child: const ASEmptyState(
+              type: ASEmptyStateType.noData,
+              title: '暂无公告',
+              description: '新的通知会出现在这里',
+            ),
           );
         }
 
@@ -530,26 +501,20 @@ class _ChildAttendanceCard extends ConsumerWidget {
       builder: (context, snapshot) {
         final summary = snapshot.data;
 
-        return ASCard(
+        return ASCard.glass(
           animate: true,
           animationIndex: animationIndex,
+          padding: const EdgeInsets.all(ASSpacing.cardPadding),
           child: Row(
             children: [
-              // 头像
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: ASColors.info.withValues(alpha: 0.1),
-                child: Text(
-                  child.fullName.substring(0, 1),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: ASColors.info,
-                  ),
-                ),
+              ASAvatar(
+                name: child.fullName,
+                size: ASAvatarSize.md,
+                showBorder: true,
+                backgroundColor: ASColors.info.withValues(alpha: 0.15),
+                foregroundColor: ASColors.info,
               ),
               const SizedBox(width: ASSpacing.md),
-              // 信息
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,7 +534,6 @@ class _ChildAttendanceCard extends ConsumerWidget {
                   ],
                 ),
               ),
-              // 本月出勤率
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [

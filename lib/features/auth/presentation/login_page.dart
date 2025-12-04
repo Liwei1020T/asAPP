@@ -4,8 +4,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/animations.dart';
+import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
-import '../../../core/widgets/as_primary_button.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../data/models/profile.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
 import '../application/auth_providers.dart';
@@ -133,8 +134,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   _buildLoginForm(theme),
                   const SizedBox(height: ASSpacing.xl),
 
-                  // 快速登录按钮（开发用）
-                  _buildQuickLoginSection(theme),
+        // 快速登录按钮（开发用）
+        _buildQuickLoginSection(theme),
                 ],
               ),
             ),
@@ -147,52 +148,49 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget _buildHeader(ThemeData theme) {
     final primaryColor = theme.colorScheme.primary;
     
-    return Column(
-      children: [
-        // Logo 图标 - 带缩放弹跳动画
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: primaryColor,
-            borderRadius: BorderRadius.circular(20),
+    return ASGlassContainer.adaptive(
+      padding: const EdgeInsets.all(ASSpacing.xl),
+      blur: ASColors.glassBlurSigma,
+      opacity: 0.9,
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: primaryColor,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.3),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.sports_tennis,
+              size: 48,
+              color: Colors.white,
+            ),
           ),
-          child: const Icon(
-            Icons.sports_tennis,
-            size: 48,
-            color: Colors.white,
+          const SizedBox(height: ASSpacing.lg),
+          Text(
+            'Art Sport Penang',
+            style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
           ),
-        )
-            .animate()
-            .scale(
-              begin: const Offset(0.5, 0.5),
-              end: const Offset(1, 1),
-              duration: ASAnimations.medium,
-              curve: ASAnimations.emphasizeCurve,
-            )
-            .fadeIn(duration: ASAnimations.normal),
-        const SizedBox(height: ASSpacing.lg),
-        Text(
-          'Art Sport Penang',
-          style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: primaryColor,
-              ),
-        )
-            .animate(delay: 100.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.3, end: 0),
-        const SizedBox(height: ASSpacing.xs),
-        Text(
-          'Management System',
-          style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.textTheme.bodySmall?.color,
-              ),
-        )
-            .animate(delay: 200.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.3, end: 0),
-      ],
+          const SizedBox(height: ASSpacing.xs),
+          Text(
+            'Management System',
+            style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.textTheme.bodySmall?.color,
+                ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -200,31 +198,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
+        ASTextField(
           controller: _emailController,
-          decoration: const InputDecoration(
-            labelText: '邮箱',
-            hintText: '请输入邮箱地址',
-            prefixIcon: Icon(Icons.email_outlined),
-          ),
+          label: '邮箱',
+          hint: '请输入邮箱地址',
+          prefixIcon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
-        )
-            .animate(delay: 300.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideX(begin: -0.1, end: 0),
+        ),
         const SizedBox(height: ASSpacing.lg),
-        TextField(
+        ASTextField(
           controller: _passwordController,
-          decoration: const InputDecoration(
-            labelText: '密码',
-            hintText: '请输入密码',
-            prefixIcon: Icon(Icons.lock_outlined),
-          ),
+          label: '密码',
+          hint: '请输入密码',
+          prefixIcon: Icons.lock_outlined,
           obscureText: true,
-        )
-            .animate(delay: 400.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideX(begin: -0.1, end: 0),
+        ),
         const SizedBox(height: ASSpacing.xl),
         ASPrimaryButton(
           label: '登录',

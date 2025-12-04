@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -95,24 +93,12 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.class_outlined, size: 64, color: hintColor)
-              .animate()
-              .fadeIn(duration: ASAnimations.normal)
-              .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1)),
-          const SizedBox(height: ASSpacing.md),
-          Text(
-            '暂无班级',
-            style: TextStyle(
-              fontSize: 18,
-              color: secondaryColor,
-            ),
-          ).animate().fadeIn(duration: ASAnimations.normal, delay: 100.ms),
-          const SizedBox(height: ASSpacing.lg),
-          ASPrimaryButton(
-            label: '创建第一个班级',
-            icon: Icons.add,
-            onPressed: _showCreateClassDialog,
-            animate: true,
+          const ASEmptyState(
+            type: ASEmptyStateType.noData,
+            title: '暂无班级',
+            description: '点击下方按钮创建第一个班级',
+            icon: Icons.class_outlined,
+            actionLabel: '创建第一个班级',
           ),
         ],
       ),

@@ -30,18 +30,12 @@ class AdminDashboardPage extends ConsumerWidget {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: ASSpacing.md),
-            child: GestureDetector(
+            child: ASAvatar(
+              imageUrl: currentUser?.avatarUrl,
+              name: currentUser?.fullName ?? 'Admin',
+              size: ASAvatarSize.sm,
+              showBorder: true,
               onTap: () => _showProfileMenu(context, ref),
-              child: CircleAvatar(
-                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                child: Text(
-                  currentUser?.fullName.substring(0, 1) ?? 'A',
-                  style: TextStyle(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
             ),
           ),
         ],
@@ -51,26 +45,25 @@ class AdminDashboardPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 问候 - 带入场动画
-            Text(
-              '欢迎回来，${currentUser?.fullName ?? 'Admin'}',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            )
-                .animate()
-                .fadeIn(duration: ASAnimations.normal)
-                .slideX(begin: -0.1, end: 0),
-            const SizedBox(height: ASSpacing.xs),
-            Text(
-              '这里是您的学院概览',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.textTheme.bodySmall?.color,
-                  ),
-            )
-                .animate(delay: 100.ms)
-                .fadeIn(duration: ASAnimations.normal),
-            const SizedBox(height: ASSpacing.xl),
+            ASHeroSection(
+              title: '欢迎回来，${currentUser?.fullName ?? 'Admin'}',
+              subtitle: '这里是您的学院概览',
+              avatar: ASAvatar(
+                name: currentUser?.fullName ?? 'Admin',
+                size: ASAvatarSize.lg,
+                showBorder: true,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                foregroundColor: theme.colorScheme.onPrimaryContainer,
+                animate: true,
+              ),
+              actions: [
+                FilledButton.icon(
+                  onPressed: () => context.push('/students'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('添加学员'),
+                ),
+              ],
+            ),
 
             // 统计概览 - 带交错动画
             _buildStatsOverview(context, ref),
@@ -110,29 +103,31 @@ class AdminDashboardPage extends ConsumerWidget {
   void _showProfileMenu(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     
-    showModalBottomSheet(
+    ASBottomSheet.show(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('个人资料'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: Icon(Icons.logout, color: theme.colorScheme.error),
-              title: Text('退出登录', style: TextStyle(color: theme.colorScheme.error)),
-              onTap: () {
-                Navigator.pop(context);
-                ref.read(supabaseAuthRepositoryProvider).signOut();
-                ref.read(currentUserProvider.notifier).setUser(null);
-                context.go('/login');
-              },
-            ),
-          ],
-        ),
+      title: '个人中心',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('个人资料'),
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/profile');
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.logout, color: theme.colorScheme.error),
+            title: Text('退出登录', style: TextStyle(color: theme.colorScheme.error)),
+            onTap: () {
+              Navigator.pop(context);
+              ref.read(supabaseAuthRepositoryProvider).signOut();
+              ref.read(currentUserProvider.notifier).setUser(null);
+              context.go('/login');
+            },
+          ),
+        ],
       ),
     );
   }
@@ -145,26 +140,37 @@ class AdminDashboardPage extends ConsumerWidget {
       _loadProfileStat(UserRole.coach),
     ]);
 
+    final skeleton = ASResponsiveBuilder(
+      mobile: Column(
+        children: List.generate(
+          3,
+          (i) => Padding(
+            padding: EdgeInsets.only(bottom: i < 2 ? ASSpacing.md : 0),
+            child: const ASSkeletonStatCard(),
+          ),
+        ),
+      ),
+      tablet: Row(
+        children: List.generate(
+          3,
+          (i) => Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: i > 0 ? ASSpacing.md : 0),
+              child: const ASSkeletonStatCard(),
+            ),
+          ),
+        ),
+      ),
+    );
+
     return FutureBuilder<List<_CountTrend>>(
       future: future,
       builder: (context, snapshot) {
-        // 加载中显示骨架屏
         if (!snapshot.hasData) {
-          return ASResponsiveBuilder(
-            mobile: Column(
-              children: List.generate(3, (i) => Padding(
-                padding: EdgeInsets.only(bottom: i < 2 ? ASSpacing.md : 0),
-                child: const ASSkeletonStatCard(),
-              )),
-            ),
-            tablet: Row(
-              children: List.generate(3, (i) => Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(left: i > 0 ? ASSpacing.md : 0),
-                  child: const ASSkeletonStatCard(),
-                ),
-              )),
-            ),
+          return ASSkeletonTransition(
+            isLoading: true,
+            skeleton: skeleton,
+            child: const SizedBox.shrink(),
           );
         }
 
@@ -174,50 +180,60 @@ class AdminDashboardPage extends ConsumerWidget {
         final coachStat = stats[2];
 
         final cards = [
-          _StatCard(
-            label: '活跃班级',
-            value: '${classStat.count}',
+          ASStatCard(
+            title: '活跃班级',
+            value: classStat.count,
+            subtitle: '学院活跃班级总览',
             icon: Icons.class_,
             color: theme.colorScheme.primary,
             trend: classStat.trend,
+            trendDirection: _resolveTrendDirection(classStat.trend),
             animationIndex: 0,
           ),
-          _StatCard(
-            label: '学员总数',
-            value: '${studentStat.count}',
+          ASStatCard(
+            title: '学员总数',
+            value: studentStat.count,
+            subtitle: '已注册学员',
             icon: Icons.people,
             color: theme.colorScheme.tertiary,
             trend: studentStat.trend,
+            trendDirection: _resolveTrendDirection(studentStat.trend),
             animationIndex: 1,
           ),
-          _StatCard(
-            label: '教练团队',
-            value: '${coachStat.count}',
+          ASStatCard(
+            title: '教练团队',
+            value: coachStat.count,
+            subtitle: '在册教练',
             icon: Icons.sports,
             color: Colors.green,
             trend: coachStat.trend,
+            trendDirection: _resolveTrendDirection(coachStat.trend),
             animationIndex: 2,
           ),
         ];
 
-        return ASResponsiveBuilder(
-          mobile: Column(
-            children: [
-              cards[0],
-              const SizedBox(height: ASSpacing.md),
-              cards[1],
-              const SizedBox(height: ASSpacing.md),
-              cards[2],
-            ],
-          ),
-          tablet: Row(
-            children: [
-              Expanded(child: cards[0]),
-              const SizedBox(width: ASSpacing.md),
-              Expanded(child: cards[1]),
-              const SizedBox(width: ASSpacing.md),
-              Expanded(child: cards[2]),
-            ],
+        return ASSkeletonTransition(
+          isLoading: false,
+          skeleton: skeleton,
+          child: ASResponsiveBuilder(
+            mobile: Column(
+              children: [
+                cards[0],
+                const SizedBox(height: ASSpacing.md),
+                cards[1],
+                const SizedBox(height: ASSpacing.md),
+                cards[2],
+              ],
+            ),
+            tablet: Row(
+              children: [
+                Expanded(child: cards[0]),
+                const SizedBox(width: ASSpacing.md),
+                Expanded(child: cards[1]),
+                const SizedBox(width: ASSpacing.md),
+                Expanded(child: cards[2]),
+              ],
+            ),
           ),
         );
       },
@@ -296,86 +312,17 @@ class AdminDashboardPage extends ConsumerWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    this.trend,
-    this.animationIndex = 0,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final String? trend;
-  final int animationIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return ASCard(
-      animate: true,
-      animationIndex: animationIndex,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              if (trend != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    trend!,
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: ASSpacing.lg),
-          Text(
-            value,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: ASSpacing.xs),
-          Text(
-            label,
-            style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.textTheme.bodySmall?.color,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CountTrend {
   final int count;
   final String trend;
   const _CountTrend(this.count, this.trend);
+}
+
+ASTrendDirection _resolveTrendDirection(String trend) {
+  final text = trend.trim();
+  if (text.startsWith('-')) return ASTrendDirection.down;
+  if (text.contains('无') || text.contains('0')) return ASTrendDirection.flat;
+  return ASTrendDirection.up;
 }
 
 Future<_CountTrend> _loadClassStat() async {

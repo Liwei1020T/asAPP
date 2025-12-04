@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/widgets/widgets.dart';
@@ -109,43 +107,21 @@ class _CoachListPageState extends ConsumerState<CoachListPage> {
           );
         },
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          FloatingActionButton.extended(
-            onPressed: _showCreateCoachDialog,
-            backgroundColor: ASColors.primary,
-            icon: const Icon(Icons.add),
-            label: const Text('新增教练'),
-          ).animate().scale(
-                delay: ASAnimations.normal,
-                duration: ASAnimations.medium,
-                curve: ASAnimations.bounceCurve,
-              ),
-          const SizedBox(height: ASSpacing.md),
-        ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showCreateCoachDialog,
+        backgroundColor: ASColors.primary,
+        icon: const Icon(Icons.add),
+        label: const Text('新增教练'),
       ),
     );
   }
 
   Widget _buildSearchBar() {
-    return TextField(
+    return ASSearchField(
       controller: _searchController,
-      decoration: InputDecoration(
-        hintText: '按姓名搜索教练',
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: _searchController.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() {});
-                },
-              )
-            : null,
-      ),
+      hint: '按姓名搜索教练',
       onChanged: (_) => setState(() {}),
+      onClear: () => setState(() {}),
     );
   }
 
@@ -153,18 +129,11 @@ class _CoachListPageState extends ConsumerState<CoachListPage> {
     final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
     final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
     
-    return ASCard(
-      animate: true,
-      child: Padding(
-        padding: const EdgeInsets.all(ASSpacing.lg),
-        child: Column(
-          children: [
-            Icon(Icons.person_search, size: 48, color: hintColor),
-            const SizedBox(height: ASSpacing.md),
-            Text('暂无教练', style: TextStyle(color: secondaryColor)),
-          ],
-        ),
-      ),
+    return const ASEmptyState(
+      type: ASEmptyStateType.noData,
+      title: '暂无教练',
+      description: '可通过右下角按钮新增教练账号',
+      icon: Icons.person_search,
     );
   }
 
@@ -225,17 +194,12 @@ class _CoachCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 22,
+                  ASAvatar(
+                    name: p.fullName,
+                    size: ASAvatarSize.md,
+                    showBorder: true,
                     backgroundColor: ASColors.primary.withValues(alpha: 0.1),
-                    child: Text(
-                      p.fullName.substring(0, 1),
-                      style: const TextStyle(
-                        color: ASColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
+                    foregroundColor: ASColors.primary,
                   ),
                   const SizedBox(width: ASSpacing.md),
                   Expanded(

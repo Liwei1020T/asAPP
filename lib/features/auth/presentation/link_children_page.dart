@@ -4,9 +4,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/animations.dart';
+import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/validators.dart';
-import '../../../core/widgets/as_primary_button.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../data/models/student.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
 import '../application/auth_providers.dart';
@@ -212,14 +213,23 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
 
     return Scaffold(
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(ASSpacing.xl),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 500),
-                    child: Column(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(ASSpacing.xl),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: _isLoading
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: const [
+                        ASSkeletonProfileCard(),
+                        SizedBox(height: ASSpacing.md),
+                        ASSkeletonProfileCard(),
+                        SizedBox(height: ASSpacing.md),
+                        ASSkeletonProfileCard(),
+                      ],
+                    )
+                  : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildHeader(theme),
@@ -232,14 +242,26 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
                           _buildMatchedStudentsSection(theme),
                           const SizedBox(height: ASSpacing.xl),
                         ],
+                        if (_linkedStudents.isEmpty && _matchedStudents.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: ASSpacing.xl),
+                            child: ASEmptyState(
+                              type: ASEmptyStateType.noData,
+                              title: '未找到可绑定的孩子',
+                              description: '您可以手动搜索孩子姓名或电话进行绑定',
+                              icon: Icons.family_restroom,
+                              actionLabel: _showSearchForm ? null : '手动搜索',
+                              onAction: () => setState(() => _showSearchForm = true),
+                            ),
+                          ),
                         _buildManualSearchSection(theme),
                         const SizedBox(height: ASSpacing.xxl),
                         _buildActions(theme),
                       ],
                     ),
-                  ),
-                ),
-              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -247,50 +269,50 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
   Widget _buildHeader(ThemeData theme) {
     final primaryColor = theme.colorScheme.primary;
 
-    return Column(
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: primaryColor.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
+    return ASGlassContainer.adaptive(
+      padding: const EdgeInsets.all(ASSpacing.xl),
+      blur: ASColors.glassBlurSigma,
+      opacity: 0.9,
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.25),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.family_restroom,
+              size: 48,
+              color: primaryColor,
+            ),
           ),
-          child: Icon(
-            Icons.family_restroom,
-            size: 48,
-            color: primaryColor,
+          const SizedBox(height: ASSpacing.lg),
+          Text(
+            '绑定您的孩子',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: primaryColor,
+            ),
           ),
-        )
-            .animate()
-            .scale(
-              begin: const Offset(0.5, 0.5),
-              end: const Offset(1, 1),
-              duration: ASAnimations.medium,
-              curve: ASAnimations.emphasizeCurve,
-            )
-            .fadeIn(duration: ASAnimations.normal),
-        const SizedBox(height: ASSpacing.lg),
-        Text(
-          '绑定您的孩子',
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+          const SizedBox(height: ASSpacing.sm),
+          Text(
+            '绑定后您可以查看孩子的训练动态和进度',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.textTheme.bodySmall?.color,
+            ),
+            textAlign: TextAlign.center,
           ),
-        )
-            .animate(delay: 100.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.3, end: 0),
-        const SizedBox(height: ASSpacing.sm),
-        Text(
-          '绑定后您可以查看孩子的训练动态和进度',
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.textTheme.bodySmall?.color,
-          ),
-          textAlign: TextAlign.center,
-        )
-            .animate(delay: 150.ms)
-            .fadeIn(duration: ASAnimations.normal),
-      ],
+        ],
+      ),
     );
   }
 
@@ -384,34 +406,24 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
     bool isSelected = false,
     VoidCallback? onToggle,
   }) {
-    return Container(
+    final borderColor = isLinked
+        ? Colors.green
+        : isSelected
+            ? theme.colorScheme.primary
+            : theme.colorScheme.surface;
+
+    return ASCard.glass(
       margin: const EdgeInsets.only(bottom: ASSpacing.sm),
-      decoration: BoxDecoration(
-        color: isLinked
-            ? Colors.green.withValues(alpha: 0.1)
-            : isSelected
-                ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
-        border: Border.all(
-          color: isLinked
-              ? Colors.green
-              : isSelected
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
-          width: 1.5,
-        ),
-      ),
+      borderColor: borderColor,
+      borderWidth: isLinked || isSelected ? 1.5 : 1,
+      glassOpacity: 0.85,
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
-          child: Text(
-            student.fullName.isNotEmpty ? student.fullName[0] : '?',
-            style: TextStyle(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        leading: ASAvatar(
+          name: student.fullName,
+          size: ASAvatarSize.sm,
+          showBorder: true,
+          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+          foregroundColor: theme.colorScheme.primary,
         ),
         title: Text(
           student.fullName,
@@ -502,23 +514,19 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextFormField(
+                  ASTextField(
                     controller: _searchNameController,
-                    decoration: const InputDecoration(
-                      labelText: '孩子姓名',
-                      hintText: '请输入孩子的姓名',
-                      prefixIcon: Icon(Icons.person_outlined),
-                    ),
+                    label: '孩子姓名',
+                    hint: '请输入孩子的姓名',
+                    prefixIcon: Icons.person_outlined,
                     validator: NameValidator.getErrorMessage,
                   ),
                   const SizedBox(height: ASSpacing.md),
-                  TextFormField(
+                  ASTextField(
                     controller: _searchPhoneController,
-                    decoration: const InputDecoration(
-                      labelText: '联系电话',
-                      hintText: '孩子或紧急联系人的电话',
-                      prefixIcon: Icon(Icons.phone_outlined),
-                    ),
+                    label: '联系电话',
+                    hint: '孩子或紧急联系人的电话',
+                    prefixIcon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
                     validator: PhoneValidator.getErrorMessage,
                   ),

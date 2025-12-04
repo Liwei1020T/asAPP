@@ -310,6 +310,34 @@ class SupabaseAuthRepository {
     );
   }
 
+  /// 更新个人资料（姓名、手机号、头像）
+  Future<Profile> updateProfile({
+    required String userId,
+    String? fullName,
+    String? phoneNumber,
+    String? avatarUrl,
+  }) async {
+    final updates = <String, dynamic>{
+      'updated_at': DateTime.now().toIso8601String(),
+      if (fullName != null) 'full_name': fullName,
+      if (phoneNumber != null) 'phone_number': phoneNumber,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+    };
+
+    // 如果只更新 updated_at，直接返回当前数据
+    if (updates.length == 1) {
+      return _fetchProfile(userId);
+    }
+
+    await supabaseClient.from('profiles').update(updates).eq('id', userId);
+    return _fetchProfile(userId);
+  }
+
+  /// 修改密码（需要已登录）
+  Future<void> updatePassword(String newPassword) async {
+    await supabaseClient.auth.updateUser(UserAttributes(password: newPassword));
+  }
+
   /// 根据用户 ID 获取 Profile
   Future<Profile> _fetchProfile(String userId) async {
     final data = await supabaseClient

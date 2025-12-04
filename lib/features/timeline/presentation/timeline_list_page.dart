@@ -1,14 +1,10 @@
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -108,7 +104,15 @@ class _TimelineListPageState extends ConsumerState<TimelineListPage> {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return Padding(
               padding: const EdgeInsets.all(ASSpacing.pagePadding),
-              child: ASSkeletonList(itemCount: 4, hasAvatar: true),
+              child: Column(
+                children: List.generate(
+                  4,
+                  (i) => Padding(
+                    padding: EdgeInsets.only(bottom: i == 3 ? 0 : ASSpacing.md),
+                    child: const ASSkeletonCard(height: 200),
+                  ),
+                ),
+              ),
             );
           }
 
@@ -138,36 +142,11 @@ class _TimelineListPageState extends ConsumerState<TimelineListPage> {
   }
 
   Widget _buildEmptyState() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
-    
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.photo_library_outlined, size: 64, color: hintColor)
-              .animate()
-              .fadeIn(duration: ASAnimations.normal)
-              .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1)),
-          const SizedBox(height: ASSpacing.md),
-          Text(
-            '暂无训练动态',
-            style: TextStyle(
-              fontSize: 18,
-              color: secondaryColor,
-            ),
-          ).animate().fadeIn(duration: ASAnimations.normal, delay: 100.ms),
-          const SizedBox(height: ASSpacing.sm),
-          Text(
-            '教练将在这里分享训练精彩瞬间',
-            style: TextStyle(
-              fontSize: 14,
-              color: hintColor,
-            ),
-          ).animate().fadeIn(duration: ASAnimations.normal, delay: 150.ms),
-        ],
-      ),
+    return const ASEmptyState(
+      type: ASEmptyStateType.noData,
+      title: '暂无训练动态',
+      description: '教练将在这里分享训练精彩瞬间',
+      icon: Icons.photo_library_outlined,
     );
   }
 
@@ -248,16 +227,12 @@ class _TimelinePostCard extends ConsumerWidget {
               final author = snapshot.data;
               return Row(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
+                  ASAvatar(
+                    name: author?.fullName ?? 'User',
+                    size: ASAvatarSize.md,
+                    showBorder: true,
                     backgroundColor: ASColors.primary.withValues(alpha: 0.1),
-                    child: Text(
-                      author?.fullName.substring(0, 1) ?? 'U',
-                      style: const TextStyle(
-                        color: ASColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    foregroundColor: ASColors.primary,
                   ),
                   const SizedBox(width: ASSpacing.md),
                   Expanded(

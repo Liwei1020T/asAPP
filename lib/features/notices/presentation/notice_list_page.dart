@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -43,11 +41,7 @@ class _NoticeListPageState extends ConsumerState<NoticeListPage> {
         backgroundColor: ASColors.primary,
         icon: const Icon(Icons.add),
         label: const Text('新增公告'),
-      ).animate().scale(
-            delay: ASAnimations.normal,
-            duration: ASAnimations.medium,
-            curve: ASAnimations.bounceCurve,
-          ),
+      ),
       body: StreamBuilder<List<Notice>>(
         stream: stream,
         builder: (context, snapshot) {
@@ -61,7 +55,7 @@ class _NoticeListPageState extends ConsumerState<NoticeListPage> {
                   const SizedBox(height: ASSpacing.sm),
                   _buildFilters(),
                   const SizedBox(height: ASSpacing.md),
-                  Expanded(child: ASSkeletonList(itemCount: 5, hasAvatar: false)),
+                  const Expanded(child: ASSkeletonNoticeCard()),
                 ],
               ),
             );
@@ -77,32 +71,31 @@ class _NoticeListPageState extends ConsumerState<NoticeListPage> {
           }).toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-          return SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.all(ASSpacing.pagePadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSourceToggle(),
-                  const SizedBox(height: ASSpacing.sm),
-                  _buildFilters(),
-                  const SizedBox(height: ASSpacing.md),
-                  if (notices.isEmpty)
-                    _buildEmpty(isDark)
-                  else
-                    ...notices.asMap().entries.map((entry) => _NoticeCard(
-                          notice: entry.value,
-                          animationIndex: entry.key,
-                          onPinToggle: () => _togglePin(entry.value),
-                          onTap: () => NoticeDetailSheet.show(context, entry.value),
-                          onEdit: () => _showEditDialog(entry.value),
-                          onDelete: () => _deleteNotice(entry.value),
-                        )),
-                  const SizedBox(height: ASSpacing.xxl),
-                ],
-              ),
-            ),
+          return ListView(
+            padding: const EdgeInsets.all(ASSpacing.pagePadding),
+            children: [
+              _buildSourceToggle(),
+              const SizedBox(height: ASSpacing.sm),
+              _buildFilters(),
+              const SizedBox(height: ASSpacing.md),
+              if (notices.isEmpty)
+                const ASEmptyState(
+                  type: ASEmptyStateType.noData,
+                  title: '暂无公告',
+                  description: '发布公告以通知教练和家长',
+                  icon: Icons.campaign_outlined,
+                )
+              else
+                ...notices.asMap().entries.map((entry) => _NoticeCard(
+                      notice: entry.value,
+                      animationIndex: entry.key,
+                      onPinToggle: () => _togglePin(entry.value),
+                      onTap: () => NoticeDetailSheet.show(context, entry.value),
+                      onEdit: () => _showEditDialog(entry.value),
+                      onDelete: () => _deleteNotice(entry.value),
+                    )),
+              const SizedBox(height: ASSpacing.xxl),
+            ],
           );
         },
       ),

@@ -15,6 +15,7 @@ import '../../auth/application/auth_providers.dart';
 import '../../../data/repositories/supabase/notice_repository.dart';
 import '../../../data/repositories/supabase/sessions_repository.dart';
 import '../../../data/repositories/supabase/hr_repository.dart';
+import '../../../data/repositories/supabase/classes_repository.dart';
 import '../../notices/presentation/notice_detail_sheet.dart';
 
 /// 教练仪表板
@@ -51,7 +52,7 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
           padding: const EdgeInsets.all(8.0),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.sports_tennis, size: 24),
@@ -61,18 +62,13 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
           // 用户头像
           Padding(
             padding: const EdgeInsets.only(right: ASSpacing.md),
-            child: GestureDetector(
+            child: ASAvatar(
+              imageUrl: currentUser?.avatarUrl,
+              name: currentUser?.fullName ?? 'C',
+              size: ASAvatarSize.sm,
+              showBorder: true,
               onTap: _showProfileMenu,
-              child: CircleAvatar(
-                backgroundColor: Colors.white.withOpacity(0.3),
-                child: Text(
-                  currentUser?.fullName.substring(0, 1) ?? 'C',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              animate: true,
             ),
           ).animate().scale(
                 delay: ASAnimations.fast,
@@ -89,31 +85,42 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 公告板块
-              const ASSectionTitle(title: '📢 公告 Notices')
-                  .animate()
-                  .fadeIn(duration: ASAnimations.normal)
-                  .slideX(begin: -0.1, end: 0),
+              ASSectionTitle(
+                title: '📢 公告 Notices',
+                animate: true,
+              ),
               _buildNoticesSection(),
 
               // 操作区域
-              const ASSectionTitle(title: '⚡ 操作 Actions')
-                  .animate()
-                  .fadeIn(duration: ASAnimations.normal, delay: 100.ms)
-                  .slideX(begin: -0.1, end: 0),
+              ASSectionTitle(
+                title: '⚡ 操作 Actions',
+                animate: true,
+                animationDelay: 100.ms,
+              ),
               _buildActionsSection(isDark),
 
               // 今日课程
-              const ASSectionTitle(title: '📅 今日班级 Today\'s Classes')
-                  .animate()
-                  .fadeIn(duration: ASAnimations.normal, delay: 200.ms)
-                  .slideX(begin: -0.1, end: 0),
+              ASSectionTitle(
+                title: '📅 今日班级 Today\'s Classes',
+                animate: true,
+                animationDelay: 200.ms,
+              ),
               _buildTodayClassesSection(),
 
+              // 即将上课
+              ASSectionTitle(
+                title: '⏭️ 即将到来的课程 Upcoming',
+                animate: true,
+                animationDelay: 250.ms,
+              ),
+              _buildUpcomingClassesSection(),
+
               // 统计数据
-              const ASSectionTitle(title: '📊 统计 Stats')
-                  .animate()
-                  .fadeIn(duration: ASAnimations.normal, delay: 300.ms)
-                  .slideX(begin: -0.1, end: 0),
+              ASSectionTitle(
+                title: '📊 统计 Stats',
+                animate: true,
+                animationDelay: 300.ms,
+              ),
               _buildStatsSection(isDark),
 
               const SizedBox(height: ASSpacing.xxl),
@@ -130,29 +137,31 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
   }
 
   void _showProfileMenu() {
-    showModalBottomSheet(
+    ASBottomSheet.show(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('个人资料'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: ASColors.error),
-              title: const Text('退出登录', style: TextStyle(color: ASColors.error)),
-              onTap: () {
-                Navigator.pop(context);
-                ref.read(supabaseAuthRepositoryProvider).signOut();
-                ref.read(currentUserProvider.notifier).setUser(null);
-                context.go('/login');
-              },
-            ),
-          ],
-        ),
+      title: '个人中心',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('个人资料'),
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/profile');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout, color: ASColors.error),
+            title: const Text('退出登录', style: TextStyle(color: ASColors.error)),
+            onTap: () {
+              Navigator.pop(context);
+              ref.read(supabaseAuthRepositoryProvider).signOut();
+              ref.read(currentUserProvider.notifier).setUser(null);
+              context.go('/login');
+            },
+          ),
+        ],
       ),
     );
   }
@@ -172,7 +181,7 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
               itemBuilder: (context, index) => Container(
                 width: 260,
                 margin: const EdgeInsets.only(right: ASSpacing.md),
-                child: const ASSkeletonCard(height: 120),
+                child: const ASSkeletonNoticeCard(),
               ),
             ),
           );
@@ -182,9 +191,11 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
         if (notices.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(ASSpacing.lg),
-            child: const Text('暂无公告')
-                .animate()
-                .fadeIn(duration: ASAnimations.normal),
+            child: const ASEmptyState(
+              type: ASEmptyStateType.noData,
+              title: '暂无公告',
+              description: '稍后再来看看最新消息',
+            ),
           );
         }
 
@@ -227,11 +238,127 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
   Future<List<Session>> _fetchTodaySessions(String coachId) async {
     if (coachId.isEmpty) return [];
     try {
-      return await ref.read(supabaseSessionsRepositoryProvider).getTodaySessionsForCoach(coachId);
+      final sessionsRepo = ref.read(supabaseSessionsRepositoryProvider);
+      var sessions = await sessionsRepo.getTodaySessionsForCoach(coachId);
+
+      // 自动根据班级排课生成今天的 Session（若缺失）
+      final classesRepo = ref.read(supabaseClassesRepositoryProvider);
+      final classes = await classesRepo.getClassesForCoach(coachId);
+      final now = DateTime.now();
+      final todayIndex = now.weekday % 7; // 0=周日, 1=周一...
+
+      final todayClasses = classes
+          .where((c) => c.defaultDayOfWeek == todayIndex && c.defaultStartTime != null && c.defaultEndTime != null)
+          .toList();
+
+      if (todayClasses.isEmpty) {
+        return sessions;
+      }
+
+      final existingByClass = <String, bool>{
+        for (final s in sessions) s.classId: true,
+      };
+
+      for (final cg in todayClasses) {
+        if (existingByClass[cg.id] == true) continue;
+
+        final startTime = _combineDateAndTime(now, cg.defaultStartTime!);
+        final endTime = _combineDateAndTime(now, cg.defaultEndTime!);
+
+        final draft = Session(
+          id: 'temp',
+          classId: cg.id,
+          coachId: coachId,
+          title: cg.name,
+          venue: cg.defaultVenue,
+          venueId: null,
+          startTime: startTime,
+          endTime: endTime,
+          status: SessionStatus.scheduled,
+          isPayable: true,
+          actualCoachId: null,
+          completedAt: null,
+          className: cg.name,
+          coachName: null,
+        );
+
+        final created = await sessionsRepo.createSession(draft);
+        sessions.add(created);
+      }
+
+      sessions.sort((a, b) => a.startTime.compareTo(b.startTime));
+      return sessions;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载今日课程失败：$e')),
+        );
+      }
+      return [];
+    }
+  }
+
+  Future<List<Session>> _fetchUpcomingSessions(String coachId) async {
+    if (coachId.isEmpty) return [];
+    try {
+      final sessionsRepo = ref.read(supabaseSessionsRepositoryProvider);
+      var sessions = await sessionsRepo.getUpcomingSessionsForCoach(coachId, limit: 6);
+
+      // 若已有即将课程，直接返回
+      if (sessions.isNotEmpty) {
+        return sessions;
+      }
+
+      // 没有即将课程时，基于班级排课预生成未来两周的课程
+      final classesRepo = ref.read(supabaseClassesRepositoryProvider);
+      final classes = await classesRepo.getClassesForCoach(coachId);
+      if (classes.isEmpty) return sessions;
+
+      final now = DateTime.now();
+      final List<Session> created = [];
+
+      for (int offset = 1; offset <= 14 && created.length < 6; offset++) {
+        final date = now.add(Duration(days: offset));
+        final index = date.weekday % 7;
+
+        for (final cg in classes) {
+          if (cg.defaultDayOfWeek != index ||
+              cg.defaultStartTime == null ||
+              cg.defaultEndTime == null) {
+            continue;
+          }
+
+          final startTime = _combineDateAndTime(date, cg.defaultStartTime!);
+          final endTime = _combineDateAndTime(date, cg.defaultEndTime!);
+
+          final draft = Session(
+            id: 'temp',
+            classId: cg.id,
+            coachId: coachId,
+            title: cg.name,
+            venue: cg.defaultVenue,
+            venueId: null,
+            startTime: startTime,
+            endTime: endTime,
+            status: SessionStatus.scheduled,
+            isPayable: true,
+            actualCoachId: null,
+            completedAt: null,
+            className: cg.name,
+            coachName: null,
+          );
+
+          final createdSession = await sessionsRepo.createSession(draft);
+          created.add(createdSession);
+        }
+      }
+
+      sessions = await sessionsRepo.getUpcomingSessionsForCoach(coachId, limit: 6);
+      return sessions;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载即将开始的课程失败：$e')),
         );
       }
       return [];
@@ -247,6 +374,13 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
     } catch (_) {
       return 0;
     }
+  }
+
+  DateTime _combineDateAndTime(DateTime date, String hhmm) {
+    final parts = hhmm.split(':');
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
   /// 操作区块
@@ -494,7 +628,7 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                 2,
                 (index) => Padding(
                   padding: const EdgeInsets.only(bottom: ASSpacing.md),
-                  child: ASSkeletonListItem(),
+                  child: const ASSkeletonSessionCard(),
                 ),
               ),
             ),
@@ -505,29 +639,11 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
         if (sessions.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(ASSpacing.pagePadding),
-            child: ASCard(
-              animate: true,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(ASSpacing.xl),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.event_available,
-                        size: 48,
-                        color: isDark ? ASColorsDark.textHint : ASColors.textHint,
-                      ),
-                      const SizedBox(height: ASSpacing.md),
-                      Text(
-                        '今天没有课程安排',
-                        style: TextStyle(
-                          color: isDark ? ASColorsDark.textSecondary : ASColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            child: const ASEmptyState(
+              type: ASEmptyStateType.noData,
+              title: '今天没有课程安排',
+              description: '保持关注，新的课程会出现在这里',
+              icon: Icons.event_available,
             ),
           );
         }
@@ -540,8 +656,70 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
               child: _SessionCard(
                 session: entry.value,
                 animationIndex: entry.key,
+                onEnterAttendance: () async {
+                  await context.push('/attendance/${entry.value.id}');
+                  if (mounted) setState(() {});
+                },
               ),
             )).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 即将上课区块
+  Widget _buildUpcomingClassesSection() {
+    final currentUser = ref.watch(currentUserProvider);
+
+    return FutureBuilder<List<Session>>(
+      future: _fetchUpcomingSessions(currentUser?.id ?? ''),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Padding(
+            padding: const EdgeInsets.all(ASSpacing.pagePadding),
+            child: Column(
+              children: List.generate(
+                2,
+                (index) => Padding(
+                  padding: const EdgeInsets.only(bottom: ASSpacing.md),
+                  child: const ASSkeletonSessionCard(),
+                ),
+              ),
+            ),
+          );
+        }
+
+        final sessions = snapshot.data!;
+        if (sessions.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(ASSpacing.pagePadding),
+            child: const ASEmptyState(
+              type: ASEmptyStateType.noData,
+              title: '暂无即将开始的课程',
+              description: '待排课后会显示在这里',
+              icon: Icons.upcoming,
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding),
+          child: Column(
+            children: sessions.asMap().entries.map((entry) {
+              final session = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: ASSpacing.md),
+                child: _SessionCard(
+                  session: session,
+                  animationIndex: entry.key,
+                  onEnterAttendance: () async {
+                    await context.push('/attendance/${session.id}');
+                    if (mounted) setState(() {});
+                  },
+                ),
+              );
+            }).toList(),
           ),
         );
       },
@@ -565,37 +743,13 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                 child: FutureBuilder<int>(
                   future: _fetchMonthlyCompleted(currentUser?.id ?? ''),
                   builder: (context, snapshot) {
-                    return ASCard(
-                      animate: true,
+                    return ASStatCard(
+                      title: '本月已上课数',
+                      subtitle: 'Sessions This Month',
+                      value: snapshot.data ?? 0,
+                      icon: Icons.schedule,
+                      color: ASColors.primary,
                       animationIndex: 0,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '本月已上课数',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: secondaryColor,
-                            ),
-                          ),
-                          Text(
-                            'Sessions This Month',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: hintColor,
-                            ),
-                          ),
-                          const SizedBox(height: ASSpacing.sm),
-                          Text(
-                            '${snapshot.data ?? 0}',
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: ASColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
                     );
                   },
                 ),
@@ -611,47 +765,15 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                           .getMonthlySummary(currentUser.id),
                   builder: (context, snapshot) {
                     final summary = snapshot.data;
-                    return ASCard(
-                      animate: true,
+                    return ASStatCard(
+                      title: '本月预计收入',
+                      subtitle: 'Estimated Income',
+                      valueText: 'RM ${summary?.totalSalary.toStringAsFixed(0) ?? '0'}',
+                      icon: Icons.account_balance_wallet,
+                      color: ASColors.success,
+                      animateValue: false,
                       animationIndex: 1,
-                      onTap: () => context.push('/salary'),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '本月预计收入',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: secondaryColor,
-                            ),
-                          ),
-                          Text(
-                            'Estimated Income',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: hintColor,
-                            ),
-                          ),
-                          const SizedBox(height: ASSpacing.sm),
-                          Row(
-                            children: [
-                              Text(
-                                'RM ${summary?.totalSalary.toStringAsFixed(0) ?? '0'}',
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: ASColors.success,
-                                ),
-                              ),
-                              const Spacer(),
-                              Icon(
-                                Icons.chevron_right,
-                                color: hintColor,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                      trend: summary == null ? '计算中' : '',
                     );
                   },
                 ),
@@ -777,10 +899,12 @@ class _SessionCard extends ConsumerWidget {
   const _SessionCard({
     required this.session,
     this.animationIndex = 0,
+    this.onEnterAttendance,
   });
 
   final Session session;
   final int animationIndex;
+  final Future<void> Function()? onEnterAttendance;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -843,10 +967,14 @@ class _SessionCard extends ConsumerWidget {
           // 点名按钮
           if (session.status == SessionStatus.scheduled)
             ASSmallButton(
-              label: '点名',
+              label: '签到点名',
               icon: Icons.checklist,
-              onPressed: () {
-                context.push('/attendance/${session.id}');
+              onPressed: () async {
+                if (onEnterAttendance != null) {
+                  await onEnterAttendance!();
+                } else {
+                  await context.push('/attendance/${session.id}');
+                }
               },
             )
           else

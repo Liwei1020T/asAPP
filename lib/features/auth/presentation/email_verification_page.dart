@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lottie/lottie.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants/animations.dart';
+import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
-import '../../../core/widgets/as_primary_button.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
 import '../../../data/repositories/supabase/supabase_client_provider.dart';
 import '../application/auth_providers.dart';
@@ -173,40 +175,30 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   Widget _buildHeader(ThemeData theme) {
     final primaryColor = theme.colorScheme.primary;
 
-    return Column(
-      children: [
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            color: primaryColor.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
+    return ASGlassContainer.adaptive(
+      padding: const EdgeInsets.all(ASSpacing.xl),
+      blur: ASColors.glassBlurSigma,
+      opacity: 0.9,
+      child: Column(
+        children: [
+          SizedBox(
+            width: 140,
+            height: 140,
+            child: Lottie.asset(
+              'assets/animations/loading_dots.json',
+              repeat: true,
+            ),
           ),
-          child: Icon(
-            Icons.mark_email_unread_outlined,
-            size: 56,
-            color: primaryColor,
+          const SizedBox(height: ASSpacing.md),
+          Text(
+            '验证您的邮箱',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: primaryColor,
+            ),
           ),
-        )
-            .animate()
-            .scale(
-              begin: const Offset(0.5, 0.5),
-              end: const Offset(1, 1),
-              duration: ASAnimations.medium,
-              curve: ASAnimations.emphasizeCurve,
-            )
-            .fadeIn(duration: ASAnimations.normal),
-        const SizedBox(height: ASSpacing.xl),
-        Text(
-          '验证您的邮箱',
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        )
-            .animate(delay: 100.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.3, end: 0),
-      ],
+        ],
+      ),
     );
   }
 
@@ -217,18 +209,13 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
           '我们已向以下邮箱发送了验证链接：',
           style: theme.textTheme.bodyLarge,
           textAlign: TextAlign.center,
-        )
-            .animate(delay: 200.ms)
-            .fadeIn(duration: ASAnimations.normal),
+        ),
         const SizedBox(height: ASSpacing.sm),
-        Container(
+        ASCard(
+          variant: ASCardVariant.glass,
           padding: const EdgeInsets.symmetric(
             horizontal: ASSpacing.lg,
             vertical: ASSpacing.md,
-          ),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
           ),
           child: Text(
             widget.email,
@@ -236,18 +223,13 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.primary,
             ),
+            textAlign: TextAlign.center,
           ),
-        )
-            .animate(delay: 250.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.2, end: 0),
+        ),
         const SizedBox(height: ASSpacing.xl),
-        Container(
+        ASCard(
+          variant: ASCardVariant.glass,
           padding: const EdgeInsets.all(ASSpacing.lg),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
-          ),
           child: Column(
             children: [
               Row(
@@ -274,10 +256,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
               _buildStep(theme, '4', '验证成功后将自动跳转'),
             ],
           ),
-        )
-            .animate(delay: 300.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.2, end: 0),
+        ),
         const SizedBox(height: ASSpacing.lg),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../data/models/student.dart';
 import '../../../data/repositories/supabase/student_repository.dart';
 
@@ -98,35 +99,35 @@ class _SelectStudentDialogState extends ConsumerState<SelectStudentDialog> {
                 ],
               ),
               const SizedBox(height: ASSpacing.md),
-              TextField(
+              ASSearchField(
                 controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: '按姓名搜索',
-                  prefixIcon: Icon(Icons.search),
-                ),
+                hint: '按姓名搜索',
                 onChanged: _onSearch,
+                onClear: () => _onSearch(''),
               ),
               const SizedBox(height: ASSpacing.md),
               Expanded(
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(child: ASSkeletonList(itemCount: 5, hasAvatar: true))
                     : _filtered.isEmpty
-                        ? const Center(child: Text('没有可添加的学员'))
+                        ? const ASEmptyState(
+                            type: ASEmptyStateType.noData,
+                            title: '没有可添加的学员',
+                            description: '请检查筛选或先创建学员',
+                            icon: Icons.person_off,
+                          )
                         : ListView.separated(
                             itemCount: _filtered.length,
                             separatorBuilder: (_, __) => const SizedBox(height: ASSpacing.sm),
                             itemBuilder: (context, index) {
                               final student = _filtered[index];
                               return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: ASColors.info.withOpacity(0.1),
-                                  child: Text(
-                                    student.fullName.substring(0, 1),
-                                    style: const TextStyle(
-                                      color: ASColors.info,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                leading: ASAvatar(
+                                  name: student.fullName,
+                                  size: ASAvatarSize.sm,
+                                  showBorder: true,
+                                  backgroundColor: ASColors.info.withValues(alpha: 0.1),
+                                  foregroundColor: ASColors.info,
                                 ),
                                 title: Text(student.fullName),
                                 subtitle: Text(

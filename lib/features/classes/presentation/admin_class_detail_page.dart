@@ -116,7 +116,16 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Padding(
+              padding: const EdgeInsets.all(ASSpacing.pagePadding),
+              child: Column(
+                children: const [
+                  ASSkeletonCard(height: 140),
+                  SizedBox(height: ASSpacing.md),
+                  ASSkeletonList(itemCount: 3, hasAvatar: true),
+                ],
+              ),
+            )
           : Column(
               children: [
                 // 班级信息卡片
@@ -290,18 +299,11 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
 
   Widget _buildStudentsTab() {
     if (_students.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.people_outline, size: 64, color: ASColors.textHint),
-            const SizedBox(height: ASSpacing.md),
-            Text(
-              '暂无学员',
-              style: TextStyle(color: ASColors.textSecondary),
-            ),
-          ],
-        ),
+      return const ASEmptyState(
+        type: ASEmptyStateType.noData,
+        title: '暂无学员',
+        description: '可在班级详情中添加学生',
+        icon: Icons.people_outline,
       );
     }
 
@@ -327,23 +329,19 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
       stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Padding(
+            padding: EdgeInsets.all(ASSpacing.pagePadding),
+            child: ASSkeletonList(itemCount: 4, hasAvatar: false),
+          );
         }
 
         final sessions = snapshot.data ?? [];
         if (sessions.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.event_outlined, size: 64, color: ASColors.textHint),
-                const SizedBox(height: ASSpacing.md),
-                Text(
-                  '暂无课程',
-                  style: TextStyle(color: ASColors.textSecondary),
-                ),
-              ],
-            ),
+          return const ASEmptyState(
+            type: ASEmptyStateType.noData,
+            title: '暂无课程',
+            description: '创建课程后将显示在这里',
+            icon: Icons.event_outlined,
           );
         }
 
@@ -489,7 +487,7 @@ class _StudentCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: ASColors.info.withOpacity(0.1),
+            backgroundColor: ASColors.info.withValues(alpha: 0.1),
             child: Text(
               student.fullName.substring(0, 1),
               style: const TextStyle(
@@ -553,7 +551,7 @@ class _SessionCard extends StatelessWidget {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: _getStatusColor().withOpacity(0.1),
+              color: _getStatusColor().withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(

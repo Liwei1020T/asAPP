@@ -3,11 +3,12 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/constants/spacing.dart';
+import '../../../core/utils/responsive_utils.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../data/models/training_material.dart';
 import '../../../data/repositories/supabase/playbook_repository.dart';
 import '../../auth/application/auth_providers.dart';
@@ -109,7 +110,7 @@ class _PlaybookListPageState extends ConsumerState<PlaybookListPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: EdgeInsets.all(ASSpacing.lg),
                   child: Text(
                     '分类',
                     style: TextStyle(
@@ -161,34 +162,12 @@ class _PlaybookListPageState extends ConsumerState<PlaybookListPage> {
               children: [
                 // 搜索栏
                 Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextField(
+                  padding: const EdgeInsets.all(ASSpacing.pagePadding),
+                  child: ASSearchField(
                     controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: '搜索资料...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _searchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
+                    hint: '搜索资料...',
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    onClear: () => setState(() => _searchQuery = ''),
                   ),
                 ),
                 // 资料列表
@@ -197,7 +176,14 @@ class _PlaybookListPageState extends ConsumerState<PlaybookListPage> {
                     stream: stream,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const Padding(
+                          padding: EdgeInsets.all(ASSpacing.pagePadding),
+                          child: ASSkeletonGrid(
+                            itemCount: 6,
+                            crossAxisCount: 3,
+                            childAspectRatio: 0.85,
+                          ),
+                        );
                       }
 
                       var materials = snapshot.data ?? [];
@@ -218,31 +204,27 @@ class _PlaybookListPageState extends ConsumerState<PlaybookListPage> {
                       }
 
                       if (materials.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.folder_open, size: 64, color: Colors.grey.shade400),
-                              const SizedBox(height: 16),
-                              Text(
-                                '暂无资料',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
+                        return const ASEmptyState(
+                          type: ASEmptyStateType.noData,
+                          title: '暂无资料',
+                          description: '上传训练视频或文档后会显示在这里',
+                          icon: Icons.folder_open,
                         );
                       }
 
                       return GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 300,
-                          childAspectRatio: 0.85,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
+                        padding: const EdgeInsets.all(ASSpacing.pagePadding),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: ASResponsive.getGridColumns(
+                            context,
+                            mobile: 1,
+                            tablet: 2,
+                            desktop: 3,
+                            largeDesktop: 4,
+                          ),
+                          childAspectRatio: 0.9,
+                          crossAxisSpacing: ASSpacing.md,
+                          mainAxisSpacing: ASSpacing.md,
                         ),
                         itemCount: materials.length,
                         itemBuilder: (context, index) {
@@ -510,135 +492,130 @@ class _MaterialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 缩略图
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (material.thumbnailUrl != null)
-                    Image.network(
-                      material.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey.shade200,
-                        child: const Center(child: Icon(Icons.image, size: 32)),
-                      ),
-                    )
-                  else
-                    Container(
-                      color: Colors.grey.shade200,
-                      child: Center(
-                        child: Icon(
-                          _getTypeIconData(material.type),
-                          size: 32,
-                          color: Colors.grey.shade400,
-                        ),
-                      ),
+    final theme = Theme.of(context);
+    final overlayColor = theme.colorScheme.surfaceContainerHighest;
+
+    return ASCard.gradient(
+      padding: EdgeInsets.zero,
+      onTap: onTap,
+      gradient: ASColors.cardGradient,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 缩略图
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (material.thumbnailUrl != null)
+                  Image.network(
+                    material.thumbnailUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: overlayColor,
+                      child: const Center(child: Icon(Icons.image, size: 32)),
                     ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        _getTypeName(material.type),
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                  )
+                else
+                  Container(
+                    color: overlayColor,
+                    child: Center(
+                      child: Icon(
+                        _getTypeIconData(material.type),
+                        size: 32,
+                        color: Colors.grey.shade400,
                       ),
                     ),
                   ),
-                ],
-              ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: ASTag(
+                    label: _getTypeName(material.type),
+                    type: ASTagType.info,
+                  ),
+                ),
+              ],
             ),
-            // 内容
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      material.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+          ),
+          // 内容
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(ASSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    material.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: Text(
+                      material.description ?? '',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Expanded(
-                      child: Text(
-                        material.description ?? '',
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.visibility, size: 14, color: Colors.grey.shade500),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${material.viewCount}',
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: Colors.grey.shade500,
                           fontSize: 12,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    Row(
-                      children: [
-                        Icon(Icons.visibility, size: 14, color: Colors.grey.shade500),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${material.viewCount}',
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12,
+                      const Spacer(),
+                      Text(
+                        material.category ?? '',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            onEdit();
+                          } else if (value == 'delete') {
+                            onDelete();
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Text('编辑'),
                           ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          material.category ?? '',
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12,
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(
+                              '删除',
+                              style: TextStyle(color: ASColors.error),
+                            ),
                           ),
-                        ),
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, size: 18),
-                          onSelected: (value) {
-                            if (value == 'edit') {
-                              onEdit();
-                            } else if (value == 'delete') {
-                              onDelete();
-                            }
-                          },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem(
-                              value: 'edit',
-                              child: Text('编辑'),
-                            ),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Text(
-                                '删除',
-                                style: TextStyle(color: ASColors.error),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

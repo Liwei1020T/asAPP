@@ -327,10 +327,48 @@ alter table sessions enable row level security;
 drop policy if exists "sessions_select_auth" on sessions;
 create policy "sessions_select_auth" on sessions for select using (auth.role() = 'authenticated');
 drop policy if exists "sessions_write_admin_or_coach" on sessions;
-create policy "sessions_write_admin_or_coach" on sessions for all using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
-  or coach_id = auth.uid()
-);
+drop policy if exists "sessions_update_admin_or_coach" on sessions;
+
+-- 教练/管理员可以为自己创建课程
+create policy "sessions_write_admin_or_coach" on sessions
+  for insert
+  with check (
+    auth.role() = 'authenticated'
+    and (
+      coach_id = auth.uid()
+      or actual_coach_id = auth.uid()
+      or exists (
+        select 1 from profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  );
+
+-- 教练/管理员可以更新自己的课程
+create policy "sessions_update_admin_or_coach" on sessions
+  for update
+  using (
+    auth.role() = 'authenticated'
+    and (
+      coach_id = auth.uid()
+      or actual_coach_id = auth.uid()
+      or exists (
+        select 1 from profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  )
+  with check (
+    auth.role() = 'authenticated'
+    and (
+      coach_id = auth.uid()
+      or actual_coach_id = auth.uid()
+      or exists (
+        select 1 from profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  );
 
 -- Attendance
 create table if not exists attendance (
@@ -629,5 +667,38 @@ create policy "playbook_upload_coach_admin" on storage.objects
       from public.profiles p
       where p.id = auth.uid()
         and p.role in ('coach','admin')
+    )
+  );
+
+-- 3. avatars 头像：所有认证用户可读，上传/更新/删除仅限本人或管理员
+drop policy if exists "avatars_read_auth" on storage.objects;
+create policy "avatars_read_auth" on storage.objects
+  for select
+  using (
+    bucket_id = 'avatars'
+    and auth.role() = 'authenticated'
+  );
+
+drop policy if exists "avatars_write_self_or_admin" on storage.objects;
+create policy "avatars_write_self_or_admin" on storage.objects
+  for all
+  using (
+    bucket_id = 'avatars'
+    and auth.role() = 'authenticated'
+    and (
+      owner = auth.uid()
+      or exists (
+        select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  )
+  with check (
+    bucket_id = 'avatars'
+    and auth.role() = 'authenticated'
+    and (
+      owner = auth.uid()
+      or exists (
+        select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'
+      )
     )
   );

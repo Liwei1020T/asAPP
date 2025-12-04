@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -31,7 +29,6 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   List<Attendance> _attendanceList = [];
   bool _isLoading = true;
   bool _isSubmitting = false;
-  CoachShift? _currentShift;
   StreamSubscription<List<Attendance>>? _attendanceSub;
   StreamSubscription<List<String>>? _membersSub;
 
@@ -191,16 +188,13 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     if (session == null || currentUser == null) return;
 
     try {
-      final shift = await ref.read(supabaseHrRepositoryProvider).clockInForSession(
+      await ref.read(supabaseHrRepositoryProvider).clockInForSession(
             coachId: currentUser.id,
             sessionId: session.id,
             classId: session.classId,
             className: session.className ?? (session.title ?? ''),
             sessionStartTime: session.startTime,
           );
-      setState(() {
-        _currentShift = shift;
-      });
     } catch (_) {
       // 打卡失败不阻塞点名流程，静默处理或按需增加提示
     }
@@ -212,13 +206,10 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     if (session == null || currentUser == null) return;
 
     try {
-      final shift = await ref.read(supabaseHrRepositoryProvider).clockOutForSession(
+      await ref.read(supabaseHrRepositoryProvider).clockOutForSession(
             coachId: currentUser.id,
             sessionId: session.id,
           );
-      setState(() {
-        _currentShift = shift;
-      });
     } catch (_) {
       // 下班打卡失败同样不影响点名结果
     }
@@ -226,8 +217,6 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return Scaffold(
       appBar: AppBar(
         title: Text('点名 · ${_session?.className ?? ''}'),
@@ -293,26 +282,12 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   }
 
   Widget _buildStudentList() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
-    
     if (_attendanceList.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.people_outline, size: 64, color: hintColor)
-                .animate()
-                .fadeIn(duration: ASAnimations.normal)
-                .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1)),
-            const SizedBox(height: ASSpacing.md),
-            Text(
-              '暂无学生',
-              style: TextStyle(color: secondaryColor),
-            ).animate().fadeIn(duration: ASAnimations.normal, delay: 100.ms),
-          ],
-        ),
+      return const ASEmptyState(
+        type: ASEmptyStateType.noData,
+        title: '暂无学生',
+        description: '请检查班级成员或稍后再试',
+        icon: Icons.people_outline,
       );
     }
 
@@ -480,7 +455,7 @@ class _StatusButton extends StatelessWidget {
           vertical: ASSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: isSelected ? color : color.withOpacity(0.1),
+          color: isSelected ? color : color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
           border: Border.all(
             color: color,

@@ -1,7 +1,16 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/animations.dart';
+import '../constants/colors.dart';
 import '../constants/spacing.dart';
+
+/// 卡片变体
+enum ASCardVariant {
+  basic,
+  gradient,
+  glass,
+}
 
 /// ASP 风格卡片组件
 /// 
@@ -16,10 +25,57 @@ class ASCard extends StatefulWidget {
     this.borderColor,
     this.borderWidth = 0,
     this.elevation = 2,
+    this.variant = ASCardVariant.basic,
+    this.gradient,
+    this.backgroundColor,
+    this.glassBlurSigma = ASColors.glassBlurSigma,
+    this.glassOpacity = 0.85,
+    this.showShadow = true,
     this.animate = false,
     this.animationDelay,
     this.animationIndex,
   });
+
+  /// 渐变卡片便捷构造
+  const ASCard.gradient({
+    super.key,
+    required this.child,
+    this.padding,
+    this.margin,
+    this.onTap,
+    this.borderColor,
+    this.borderWidth = 0,
+    this.elevation = 2,
+    Gradient? gradient,
+    this.backgroundColor,
+    this.glassBlurSigma = ASColors.glassBlurSigma,
+    this.glassOpacity = 0.9,
+    this.showShadow = true,
+    this.animate = false,
+    this.animationDelay,
+    this.animationIndex,
+  })  : variant = ASCardVariant.gradient,
+        gradient = gradient ?? ASColors.cardGradient;
+
+  /// 玻璃态卡片便捷构造
+  const ASCard.glass({
+    super.key,
+    required this.child,
+    this.padding,
+    this.margin,
+    this.onTap,
+    this.borderColor,
+    this.borderWidth = 1,
+    this.elevation = 0,
+    this.gradient,
+    this.backgroundColor,
+    this.glassBlurSigma = ASColors.glassBlurSigmaLight,
+    this.glassOpacity = 0.7,
+    this.showShadow = false,
+    this.animate = false,
+    this.animationDelay,
+    this.animationIndex,
+  }) : variant = ASCardVariant.glass;
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -28,6 +84,12 @@ class ASCard extends StatefulWidget {
   final Color? borderColor;
   final double borderWidth;
   final double elevation;
+  final ASCardVariant variant;
+  final Gradient? gradient;
+  final Color? backgroundColor;
+  final double glassBlurSigma;
+  final double glassOpacity;
+  final bool showShadow;
   
   /// 是否启用入场动画
   final bool animate;
@@ -51,7 +113,9 @@ class _ASCardState extends State<ASCard> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    final cardColor = theme.cardTheme.color ?? theme.colorScheme.surface;
+    final cardColor = widget.backgroundColor ?? 
+        theme.cardTheme.color ?? 
+        theme.colorScheme.surface;
     final shadowColor = isDark 
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.1);
@@ -65,6 +129,16 @@ class _ASCardState extends State<ASCard> {
 
     final scaleValue = _isPressed ? ASAnimations.buttonPressScale : 1.0;
 
+    final borderRadius = BorderRadius.circular(ASSpacing.cardRadius);
+    final effectiveGradient = widget.gradient ??
+        (widget.variant == ASCardVariant.gradient
+            ? ASColors.cardGradient
+            : null);
+    final effectiveBorderColor = widget.borderColor ??
+        (widget.variant == ASCardVariant.glass
+            ? (isDark ? ASColorsDark.glassBorder : ASColors.glassBorderLight)
+            : null);
+
     Widget card = AnimatedContainer(
       duration: ASAnimations.fast,
       curve: ASAnimations.defaultCurve,
@@ -73,23 +147,41 @@ class _ASCardState extends State<ASCard> {
         ..setEntry(1, 1, scaleValue),
       transformAlignment: Alignment.center,
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
-        border: widget.borderColor != null && widget.borderWidth > 0
-            ? Border.all(color: widget.borderColor!, width: widget.borderWidth)
+        color: widget.variant == ASCardVariant.glass
+            ? (cardColor.withValues(alpha: widget.glassOpacity))
+            : cardColor,
+        gradient: effectiveGradient,
+        borderRadius: borderRadius,
+        border: effectiveBorderColor != null && widget.borderWidth > 0
+            ? Border.all(color: effectiveBorderColor, width: widget.borderWidth)
             : null,
-        boxShadow: [
-          BoxShadow(
-            color: shadowColor,
-            blurRadius: currentElevation * 2,
-            offset: Offset(0, currentElevation),
-          ),
-        ],
+        boxShadow: widget.showShadow
+            ? [
+                BoxShadow(
+                  color: shadowColor,
+                  blurRadius: currentElevation * 2,
+                  offset: Offset(0, currentElevation),
+                ),
+              ]
+            : null,
       ),
       padding: widget.padding ?? const EdgeInsets.all(ASSpacing.cardPadding),
       margin: widget.margin,
       child: widget.child,
     );
+
+    if (widget.variant == ASCardVariant.glass) {
+      card = ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: widget.glassBlurSigma,
+            sigmaY: widget.glassBlurSigma,
+          ),
+          child: card,
+        ),
+      );
+    }
 
     if (widget.onTap != null) {
       card = MouseRegion(

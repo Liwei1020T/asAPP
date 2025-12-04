@@ -1,58 +1,145 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
 import '../constants/spacing.dart';
 
-/// ASP-MS 应用主题
+/// ASP-MS Premium App Theme
 class AppTheme {
   AppTheme._();
 
-  /// 浅色主题
+  // ============ Typography ============
+  
+  static TextTheme _getTextTheme(Brightness brightness) {
+    final baseTextTheme = brightness == Brightness.light
+        ? ThemeData.light().textTheme
+        : ThemeData.dark().textTheme;
+    
+    // Using Inter for a modern, clean look
+    return GoogleFonts.interTextTheme(baseTextTheme).copyWith(
+      displayLarge: GoogleFonts.inter(
+        fontSize: 57,
+        fontWeight: FontWeight.w300,
+        letterSpacing: -0.25,
+      ),
+      displayMedium: GoogleFonts.inter(
+        fontSize: 45,
+        fontWeight: FontWeight.w400,
+      ),
+      displaySmall: GoogleFonts.inter(
+        fontSize: 36,
+        fontWeight: FontWeight.w400,
+      ),
+      headlineLarge: GoogleFonts.inter(
+        fontSize: 32,
+        fontWeight: FontWeight.w600,
+      ),
+      headlineMedium: GoogleFonts.inter(
+        fontSize: 28,
+        fontWeight: FontWeight.w600,
+      ),
+      headlineSmall: GoogleFonts.inter(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+      ),
+      titleLarge: GoogleFonts.inter(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+      ),
+      titleMedium: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.15,
+      ),
+      titleSmall: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.1,
+      ),
+      bodyLarge: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.5,
+      ),
+      bodyMedium: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.25,
+      ),
+      labelLarge: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.1,
+      ),
+    );
+  }
+
+  /// Light Theme
   static ThemeData get lightTheme {
+    final textTheme = _getTextTheme(Brightness.light);
+    
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: ASColors.primary,
+      colorScheme: ColorScheme(
+        brightness: Brightness.light,
         primary: ASColors.primary,
         onPrimary: ASColors.textOnPrimary,
-        secondary: ASColors.primaryLight,
-        surface: ASColors.surface,
+        primaryContainer: ASColors.primaryContainer,
+        onPrimaryContainer: ASColors.onPrimaryContainer,
+        secondary: ASColors.secondary,
+        onSecondary: Colors.white,
+        secondaryContainer: ASColors.secondaryContainer,
+        onSecondaryContainer: ASColors.onSecondaryContainer,
+        tertiary: ASColors.tertiary,
+        onTertiary: Colors.white,
+        tertiaryContainer: ASColors.tertiaryContainer,
+        onTertiaryContainer: ASColors.onTertiaryContainer,
         error: ASColors.error,
-        brightness: Brightness.light,
+        onError: Colors.white,
+        surface: ASColors.surface,
+        onSurface: ASColors.textPrimary,
+        surfaceContainerHighest: ASColors.surfaceContainerHighest,
+        onSurfaceVariant: ASColors.textSecondary,
+        outline: ASColors.outline,
+        outlineVariant: ASColors.outlineVariant,
       ),
       scaffoldBackgroundColor: ASColors.background,
-
-      // AppBar 主题
-      appBarTheme: const AppBarTheme(
-        backgroundColor: ASColors.primary,
-        foregroundColor: ASColors.textOnPrimary,
-        elevation: 0,
-        centerTitle: false,
-        titleTextStyle: TextStyle(
-          color: ASColors.textOnPrimary,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-        ),
-        iconTheme: IconThemeData(color: ASColors.textOnPrimary),
+      textTheme: textTheme.apply(
+        bodyColor: ASColors.textPrimary,
+        displayColor: ASColors.textPrimary,
       ),
 
-      // 卡片主题
+      // AppBar Theme
+      appBarTheme: AppBarTheme(
+        backgroundColor: ASColors.surface,
+        foregroundColor: ASColors.textPrimary,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
+          color: ASColors.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        iconTheme: const IconThemeData(color: ASColors.textPrimary),
+      ),
+
+      // Card Theme
       cardTheme: CardThemeData(
-        color: ASColors.cardBackground,
-        elevation: 2,
-        shadowColor: ASColors.shadow,
+        color: ASColors.surface,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
+          side: const BorderSide(color: ASColors.outlineVariant),
         ),
         margin: EdgeInsets.zero,
       ),
 
-      // 按钮主题
+      // Button Themes
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: ASColors.primary,
           foregroundColor: ASColors.textOnPrimary,
-          elevation: 2,
+          elevation: 0,
           padding: const EdgeInsets.symmetric(
             horizontal: ASSpacing.xl,
             vertical: ASSpacing.md,
@@ -60,35 +147,74 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: ASColors.primary,
+          foregroundColor: ASColors.textOnPrimary,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(
+            horizontal: ASSpacing.xl,
+            vertical: ASSpacing.md,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
+          ),
+          textStyle: textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
 
-      // 文本按钮主题
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: ASColors.primary,
+          side: const BorderSide(color: ASColors.outline),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ASSpacing.xl,
+            vertical: ASSpacing.md,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
+          ),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: ASColors.primary,
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+          padding: const EdgeInsets.symmetric(
+            horizontal: ASSpacing.md,
+            vertical: ASSpacing.sm,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
+          ),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
 
-      // 输入框主题
+      // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: ASColors.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-          borderSide: const BorderSide(color: ASColors.divider),
+          borderSide: const BorderSide(color: ASColors.outline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-          borderSide: const BorderSide(color: ASColors.divider),
+          borderSide: const BorderSide(color: ASColors.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
@@ -102,173 +228,85 @@ class AppTheme {
           horizontal: ASSpacing.lg,
           vertical: ASSpacing.md,
         ),
+        hintStyle: textTheme.bodyLarge?.copyWith(color: ASColors.textHint),
       ),
 
-      // 文字主题
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.bold,
-          color: ASColors.textPrimary,
-        ),
-        headlineMedium: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: ASColors.textPrimary,
-        ),
-        headlineSmall: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: ASColors.textPrimary,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: ASColors.textPrimary,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: ASColors.textPrimary,
-        ),
-        titleSmall: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: ASColors.textPrimary,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          color: ASColors.textPrimary,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          color: ASColors.textPrimary,
-        ),
-        bodySmall: TextStyle(
-          fontSize: 12,
-          color: ASColors.textSecondary,
-        ),
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: ASColors.textPrimary,
-        ),
-        labelMedium: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: ASColors.textSecondary,
-        ),
-        labelSmall: TextStyle(
-          fontSize: 10,
-          color: ASColors.textHint,
-        ),
-      ),
-
-      // 分隔线主题
+      // Divider Theme
       dividerTheme: const DividerThemeData(
-        color: ASColors.divider,
+        color: ASColors.outlineVariant,
         thickness: 1,
         space: 1,
-      ),
-
-      // Snackbar 主题
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: ASColors.textPrimary,
-        contentTextStyle: const TextStyle(color: ASColors.textOnPrimary),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-
-      // NavigationBar 主题
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: ASColors.surface,
-        indicatorColor: ASColors.primary.withValues(alpha: 0.1),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-              color: ASColors.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            );
-          }
-          return const TextStyle(
-            color: ASColors.textSecondary,
-            fontSize: 12,
-          );
-        }),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: ASColors.primary);
-          }
-          return const IconThemeData(color: ASColors.textSecondary);
-        }),
-      ),
-
-      // NavigationRail 主题
-      navigationRailTheme: const NavigationRailThemeData(
-        backgroundColor: ASColors.surface,
-        selectedIconTheme: IconThemeData(color: ASColors.primary),
-        unselectedIconTheme: IconThemeData(color: ASColors.textSecondary),
-        selectedLabelTextStyle: TextStyle(
-          color: ASColors.primary,
-          fontWeight: FontWeight.bold,
-        ),
-        unselectedLabelTextStyle: TextStyle(
-          color: ASColors.textSecondary,
-        ),
       ),
     );
   }
 
-  /// 深色主题
+  /// Dark Theme
   static ThemeData get darkTheme {
+    final textTheme = _getTextTheme(Brightness.dark);
+    
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: ASColorsDark.primary,
+      colorScheme: ColorScheme(
+        brightness: Brightness.dark,
         primary: ASColorsDark.primary,
         onPrimary: ASColorsDark.textOnPrimary,
-        secondary: ASColorsDark.primaryLight,
+        primaryContainer: ASColorsDark.primaryContainer,
+        onPrimaryContainer: ASColorsDark.onPrimaryContainer,
+        secondary: ASColorsDark.secondary,
+        onSecondary: Colors.white,
+        secondaryContainer: ASColorsDark.secondaryContainer,
+        onSecondaryContainer: ASColorsDark.onSecondaryContainer,
+        tertiary: ASColorsDark.tertiary,
+        onTertiary: Colors.white,
+        tertiaryContainer: ASColorsDark.tertiaryContainer,
+        onTertiaryContainer: ASColorsDark.onTertiaryContainer,
+        error: ASColors.error,
+        onError: Colors.white,
         surface: ASColorsDark.surface,
-        error: ASColorsDark.error,
-        brightness: Brightness.dark,
+        onSurface: ASColorsDark.textPrimary,
+        surfaceContainerHighest: ASColorsDark.surfaceContainerHighest,
+        onSurfaceVariant: ASColorsDark.textSecondary,
+        outline: ASColorsDark.outline,
+        outlineVariant: ASColorsDark.outlineVariant,
       ),
       scaffoldBackgroundColor: ASColorsDark.background,
-
-      // AppBar 主题
-      appBarTheme: const AppBarTheme(
-        backgroundColor: ASColorsDark.cardBackground,
-        foregroundColor: ASColorsDark.textPrimary,
-        elevation: 0,
-        centerTitle: false,
-        titleTextStyle: TextStyle(
-          color: ASColorsDark.textPrimary,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-        ),
-        iconTheme: IconThemeData(color: ASColorsDark.textPrimary),
+      textTheme: textTheme.apply(
+        bodyColor: ASColorsDark.textPrimary,
+        displayColor: ASColorsDark.textPrimary,
       ),
 
-      // 卡片主题
+      // AppBar Theme
+      appBarTheme: AppBarTheme(
+        backgroundColor: ASColorsDark.surface,
+        foregroundColor: ASColorsDark.textPrimary,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
+          color: ASColorsDark.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        iconTheme: const IconThemeData(color: ASColorsDark.textPrimary),
+      ),
+
+      // Card Theme
       cardTheme: CardThemeData(
-        color: ASColorsDark.cardBackground,
-        elevation: 4,
-        shadowColor: ASColorsDark.shadow,
+        color: ASColorsDark.surfaceContainerLow,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
+          side: const BorderSide(color: ASColorsDark.outlineVariant),
         ),
         margin: EdgeInsets.zero,
       ),
 
-      // 按钮主题
+      // Button Themes
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: ASColorsDark.primary,
           foregroundColor: ASColorsDark.textOnPrimary,
-          elevation: 4,
+          elevation: 0,
           padding: const EdgeInsets.symmetric(
             horizontal: ASSpacing.xl,
             vertical: ASSpacing.md,
@@ -276,188 +314,75 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: ASColorsDark.primary,
+          foregroundColor: ASColorsDark.textOnPrimary,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(
+            horizontal: ASSpacing.xl,
+            vertical: ASSpacing.md,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
+          ),
+          textStyle: textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
 
-      // 文本按钮主题
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
           foregroundColor: ASColorsDark.primary,
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+          side: const BorderSide(color: ASColorsDark.outline),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ASSpacing.xl,
+            vertical: ASSpacing.md,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
+          ),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
 
-      // 输入框主题
+      // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: ASColorsDark.surface,
+        fillColor: ASColorsDark.surfaceContainerLow,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-          borderSide: const BorderSide(color: ASColorsDark.divider),
+          borderSide: const BorderSide(color: ASColorsDark.outline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-          borderSide: const BorderSide(color: ASColorsDark.divider),
+          borderSide: const BorderSide(color: ASColorsDark.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
           borderSide: const BorderSide(color: ASColorsDark.primary, width: 2),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-          borderSide: const BorderSide(color: ASColorsDark.error),
-        ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: ASSpacing.lg,
           vertical: ASSpacing.md,
         ),
-        hintStyle: const TextStyle(color: ASColorsDark.textHint),
-        labelStyle: const TextStyle(color: ASColorsDark.textSecondary),
+        hintStyle: textTheme.bodyLarge?.copyWith(color: ASColorsDark.textHint),
       ),
 
-      // 文字主题
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.bold,
-          color: ASColorsDark.textPrimary,
-        ),
-        headlineMedium: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: ASColorsDark.textPrimary,
-        ),
-        headlineSmall: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: ASColorsDark.textPrimary,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: ASColorsDark.textPrimary,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: ASColorsDark.textPrimary,
-        ),
-        titleSmall: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: ASColorsDark.textPrimary,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          color: ASColorsDark.textPrimary,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          color: ASColorsDark.textPrimary,
-        ),
-        bodySmall: TextStyle(
-          fontSize: 12,
-          color: ASColorsDark.textSecondary,
-        ),
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: ASColorsDark.textPrimary,
-        ),
-        labelMedium: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: ASColorsDark.textSecondary,
-        ),
-        labelSmall: TextStyle(
-          fontSize: 10,
-          color: ASColorsDark.textHint,
-        ),
-      ),
-
-      // 分隔线主题
+      // Divider Theme
       dividerTheme: const DividerThemeData(
-        color: ASColorsDark.divider,
+        color: ASColorsDark.outlineVariant,
         thickness: 1,
         space: 1,
-      ),
-
-      // Snackbar 主题
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: ASColorsDark.cardBackground,
-        contentTextStyle: const TextStyle(color: ASColorsDark.textPrimary),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-
-      // NavigationBar 主题
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: ASColorsDark.surface,
-        indicatorColor: ASColorsDark.primary.withValues(alpha: 0.2),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-              color: ASColorsDark.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            );
-          }
-          return const TextStyle(
-            color: ASColorsDark.textSecondary,
-            fontSize: 12,
-          );
-        }),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: ASColorsDark.primary);
-          }
-          return const IconThemeData(color: ASColorsDark.textSecondary);
-        }),
-      ),
-
-      // NavigationRail 主题
-      navigationRailTheme: const NavigationRailThemeData(
-        backgroundColor: ASColorsDark.surface,
-        selectedIconTheme: IconThemeData(color: ASColorsDark.primary),
-        unselectedIconTheme: IconThemeData(color: ASColorsDark.textSecondary),
-        selectedLabelTextStyle: TextStyle(
-          color: ASColorsDark.primary,
-          fontWeight: FontWeight.bold,
-        ),
-        unselectedLabelTextStyle: TextStyle(
-          color: ASColorsDark.textSecondary,
-        ),
-      ),
-
-      // Dialog 主题
-      dialogTheme: DialogThemeData(
-        backgroundColor: ASColorsDark.cardBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
-        ),
-      ),
-
-      // BottomSheet 主题
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: ASColorsDark.cardBackground,
-        modalBackgroundColor: ASColorsDark.cardBackground,
-      ),
-
-      // PopupMenu 主题
-      popupMenuTheme: PopupMenuThemeData(
-        color: ASColorsDark.cardBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-        ),
       ),
     );
   }

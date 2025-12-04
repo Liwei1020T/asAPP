@@ -1,13 +1,18 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/constants/spacing.dart';
+import '../../../core/utils/responsive_utils.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../data/models/student.dart';
 import '../../../data/repositories/supabase/student_repository.dart';
+import '../../../data/repositories/supabase/storage_repository.dart';
 
 class StudentListPage extends ConsumerStatefulWidget {
   const StudentListPage({super.key});
@@ -89,18 +94,12 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
                 _stats = _computeStats(students);
 
                 if (students.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.person_off, size: 64, color: Colors.grey.shade400),
-                        const SizedBox(height: 16),
-                        const Text('暂无学员'),
-                      ],
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(duration: ASAnimations.normal);
+                  return const ASEmptyState(
+                    type: ASEmptyStateType.noData,
+                    title: '暂无学员',
+                    description: '可添加学员或调整筛选条件',
+                    icon: Icons.person_off,
+                  );
                 }
 
                 return ListView.builder(
@@ -125,92 +124,77 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
 
   Widget _buildStatsRow(Map<String, dynamic> stats) {
     final theme = Theme.of(context);
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          _StatCard(
-            title: '总学员',
-            value: '${stats['total']}',
-            icon: Icons.people,
-            color: theme.colorScheme.primary,
-            animationIndex: 0,
-          ),
-          const SizedBox(width: 12),
-          _StatCard(
-            title: '活跃',
-            value: '${stats['active']}',
-            icon: Icons.check_circle,
-            color: Colors.green,
-            animationIndex: 1,
-          ),
-          const SizedBox(width: 12),
-          _StatCard(
-            title: '课时不足',
-            value: '${stats['lowBalance']}',
-            icon: Icons.warning,
-            color: Colors.orange,
-            animationIndex: 2,
-          ),
-          const SizedBox(width: 12),
-          _StatCard(
-            title: '已结业',
-            value: '${stats['graduated']}',
-            icon: Icons.school,
-            color: Colors.blue,
-            animationIndex: 3,
-          ),
-        ],
+    final cards = [
+      ASStatCard(
+        title: '总学员',
+        value: stats['total'],
+        icon: Icons.people,
+        color: theme.colorScheme.primary,
+        animationIndex: 0,
+      ),
+      ASStatCard(
+        title: '活跃',
+        value: stats['active'],
+        icon: Icons.check_circle,
+        color: Colors.green,
+        animationIndex: 1,
+      ),
+      ASStatCard(
+        title: '课时不足',
+        value: stats['lowBalance'],
+        icon: Icons.warning,
+        color: Colors.orange,
+        animationIndex: 2,
+      ),
+      ASStatCard(
+        title: '已结业',
+        value: stats['graduated'],
+        icon: Icons.school,
+        color: Colors.blue,
+        animationIndex: 3,
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.all(ASSpacing.pagePadding),
+      child: ASResponsiveWrap(
+        spacing: ASSpacing.md,
+        runSpacing: ASSpacing.md,
+        children: cards
+            .map((card) => SizedBox(
+                  width: 240,
+                  child: card,
+                ))
+            .toList(),
       ),
     );
   }
 
   Widget _buildFilterBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding, vertical: ASSpacing.sm),
       child: Row(
         children: [
           Expanded(
             flex: 2,
-            child: TextField(
+            child: ASSearchField(
               controller: _searchController,
-              decoration: InputDecoration(
-                hintText: '搜索学员姓名或家长...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
-              onChanged: (value) {
-                setState(() => _searchQuery = value);
-              },
+              hint: '搜索学员姓名或家长...',
+              onChanged: (value) => setState(() => _searchQuery = value),
+              onClear: () => setState(() => _searchQuery = ''),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: ASSpacing.md),
           Expanded(
             child: DropdownButtonFormField<StudentStatus?>(
               value: _statusFilter,
               decoration: InputDecoration(
                 labelText: '状态',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
                 ),
                 filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               ),
               items: [
                 const DropdownMenuItem(value: null, child: Text('全部')),
@@ -226,18 +210,17 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
               },
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: ASSpacing.md),
           Expanded(
             child: DropdownButtonFormField<StudentLevel?>(
               value: _levelFilter,
               decoration: InputDecoration(
                 labelText: '等级',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
                 ),
                 filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               ),
               items: [
                 const DropdownMenuItem(value: null, child: Text('全部')),
@@ -259,133 +242,173 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
   }
 
   void _showStudentDetail(Student student) {
+    String? avatarUrl = student.avatarUrl;
+    bool isUploadingAvatar = false;
+    final theme = Theme.of(context);
+
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          width: 600,
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundImage: student.avatarUrl != null
-                          ? NetworkImage(student.avatarUrl!)
-                          : null,
-                      child: student.avatarUrl == null
-                          ? Text(student.fullName[0], style: const TextStyle(fontSize: 28))
-                          : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              child: Container(
+                width: 600,
+                padding: const EdgeInsets.all(24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          ASAvatar(
+                            imageUrl: avatarUrl,
+                            name: student.fullName,
+                            size: ASAvatarSize.xl,
+                            showBorder: true,
+                            backgroundColor: theme.colorScheme.primaryContainer,
+                            foregroundColor: theme.colorScheme.onPrimaryContainer,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      student.fullName,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _buildStatusChip(student.status),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${student.age ?? '-'}岁 · ${student.gender ?? '未知'} · ${getStudentLevelName(student.level)}',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: isUploadingAvatar
+                                    ? null
+                                    : () async {
+                                        setDialogState(() {
+                                          isUploadingAvatar = true;
+                                        });
+                                        final url = await _uploadStudentAvatar(student);
+                                        setDialogState(() {
+                                          isUploadingAvatar = false;
+                                          if (url != null) {
+                                            avatarUrl = url;
+                                          }
+                                        });
+                                      },
+                                icon: isUploadingAvatar
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.camera_alt_outlined),
+                                label: Text(isUploadingAvatar ? '上传中...' : '更换头像'),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      _buildDetailSection('课时信息', [
+                        _DetailRow(label: '剩余课时', value: '${student.remainingSessions}节'),
+                        _DetailRow(label: '总课时', value: '${student.totalSessions}节'),
+                        _DetailRow(
+                          label: '出勤率',
+                          value: '${(student.attendanceRate * 100).toStringAsFixed(1)}%',
+                        ),
+                      ]),
+                      const SizedBox(height: 16),
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
+                              const Text('课时余额'),
                               Text(
-                                student.fullName,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                '${student.remainingSessions}/${student.totalSessions}',
+                                style: TextStyle(color: Colors.grey.shade600),
                               ),
-                              const SizedBox(width: 8),
-                              _buildStatusChip(student.status),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${student.age ?? '-'}岁 · ${student.gender ?? '未知'} · ${getStudentLevelName(student.level)}',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
+                          const SizedBox(height: 8),
+                          LinearProgressIndicator(
+                            value: student.sessionBalancePercent,
+                            backgroundColor: Colors.grey.shade200,
+                            valueColor: AlwaysStoppedAnimation(
+                              student.remainingSessions <= 5 ? Colors.orange : ASColors.primary,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 16),
-                _buildDetailSection('课时信息', [
-                  _DetailRow(label: '剩余课时', value: '${student.remainingSessions}节'),
-                  _DetailRow(label: '总课时', value: '${student.totalSessions}节'),
-                  _DetailRow(label: '出勤率', value: '${(student.attendanceRate * 100).toStringAsFixed(1)}%'),
-                ]),
-                const SizedBox(height: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('课时余额'),
-                        Text(
-                          '${student.remainingSessions}/${student.totalSessions}',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: student.sessionBalancePercent,
-                      backgroundColor: Colors.grey.shade200,
-                      valueColor: AlwaysStoppedAnimation(
-                        student.remainingSessions <= 5 ? Colors.orange : ASColors.primary,
+                      const SizedBox(height: 24),
+                      _buildDetailSection('联系信息', [
+                        _DetailRow(label: '家长', value: student.parentName ?? '-'),
+                        _DetailRow(label: '紧急联系人', value: student.emergencyContact ?? '-'),
+                        _DetailRow(label: '紧急电话', value: student.emergencyPhone ?? '-'),
+                        if (student.phoneNumber != null)
+                          _DetailRow(label: '学员电话', value: student.phoneNumber!),
+                      ]),
+                      const SizedBox(height: 24),
+                      _buildDetailSection('其他信息', [
+                        _DetailRow(label: '入学日期', value: _formatDate(student.enrollmentDate)),
+                        if (student.notes != null && student.notes!.isNotEmpty)
+                          _DetailRow(label: '备注', value: student.notes!),
+                      ]),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('关闭'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _showEditStudentDialog(student);
+                            },
+                            icon: const Icon(Icons.edit),
+                            label: const Text('编辑'),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
-                _buildDetailSection('联系信息', [
-                  _DetailRow(label: '家长', value: student.parentName ?? '-'),
-                  _DetailRow(label: '紧急联系人', value: student.emergencyContact ?? '-'),
-                  _DetailRow(label: '紧急电话', value: student.emergencyPhone ?? '-'),
-                  if (student.phoneNumber != null)
-                    _DetailRow(label: '学员电话', value: student.phoneNumber!),
-                ]),
-                const SizedBox(height: 24),
-                _buildDetailSection('其他信息', [
-                  _DetailRow(label: '入学日期', value: _formatDate(student.enrollmentDate)),
-                  if (student.notes != null && student.notes!.isNotEmpty)
-                    _DetailRow(label: '备注', value: student.notes!),
-                ]),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('关闭'),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showEditStudentDialog(student);
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('编辑'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -450,6 +473,55 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
 
   void _showEditStudentDialog(Student student) {
     _showStudentFormDialog(student);
+  }
+
+  Future<String?> _uploadStudentAvatar(Student student) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || result.files.first.bytes == null) {
+      return null;
+    }
+
+    final bytes = result.files.first.bytes as Uint8List;
+    final fileName = result.files.first.name;
+    final storageRepo = ref.read(supabaseStorageRepositoryProvider);
+    final studentRepo = ref.read(supabaseStudentRepositoryProvider);
+    final path = 'avatars/students/${student.id}/${DateTime.now().millisecondsSinceEpoch}-$fileName';
+
+    try {
+      final url = await storageRepo.uploadBytes(
+        bytes: bytes,
+        bucket: 'avatars',
+        path: path,
+        fileOptions: FileOptions(
+          upsert: false,
+          contentType: 'image/jpeg',
+        ),
+      );
+
+      final updated = student.copyWith(
+        avatarUrl: url,
+        updatedAt: DateTime.now(),
+      );
+      await studentRepo.updateStudent(updated);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('头像已更新')),
+        );
+      }
+
+      return url;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('上传失败：$e')),
+        );
+      }
+      return null;
+    }
   }
 
   void _showStudentFormDialog(Student? student) {
@@ -780,66 +852,6 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final int animationIndex;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-    this.animationIndex = 0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    title,
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      )
-          .animate(delay: ASAnimations.getStaggerDelay(animationIndex))
-          .fadeIn(duration: ASAnimations.normal)
-          .slideY(begin: 0.2, end: 0),
-    );
-  }
-}
-
 class _StudentCard extends StatelessWidget {
   final Student student;
   final VoidCallback onTap;
@@ -855,7 +867,7 @@ class _StudentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
-    
+
     return ASCard(
       animate: true,
       animationIndex: animationIndex,
@@ -863,17 +875,14 @@ class _StudentCard extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: primaryColor.withValues(alpha: 0.1),
-            child: Text(
-              student.fullName.substring(0, 1),
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: primaryColor,
-              ),
-            ),
+          ASAvatar(
+            imageUrl: student.avatarUrl,
+            name: student.fullName,
+            size: ASAvatarSize.lg,
+            showBorder: true,
+            backgroundColor:
+                student.avatarUrl == null ? primaryColor.withValues(alpha: 0.1) : null,
+            foregroundColor: student.avatarUrl == null ? primaryColor : null,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -888,97 +897,75 @@ class _StudentCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                            ),
-                          ),
                         ),
-                        _buildStatusBadge(student.status),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${student.age ?? '-'}岁 · ${getStudentLevelName(student.level)} · ${student.parentName ?? '家长未知'}',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 13,
                       ),
                     ),
+                    _buildStatusBadge(student.status),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        size: 16,
-                        color: student.remainingSessions <= 5
-                            ? Colors.orange
-                            : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '余${student.remainingSessions}节',
-                        style: TextStyle(
-                          color: student.remainingSessions <= 5
-                              ? Colors.orange
-                              : Colors.grey.shade600,
-                          fontWeight: student.remainingSessions <= 5
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 4),
+                Text(
+                  '${student.age ?? '-'}岁 · ${getStudentLevelName(student.level)} · ${student.parentName ?? '家长未知'}',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 13,
                   ),
-                  const SizedBox(height: 4),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 16,
+                    color: student.remainingSessions <= 5
+                        ? Colors.orange
+                        : Colors.grey.shade600,
+                  ),
+                  const SizedBox(width: 4),
                   Text(
-                    '出勤率 ${(student.attendanceRate * 100).toStringAsFixed(0)}%',
+                    '余${student.remainingSessions}节',
                     style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: 12,
+                      color: student.remainingSessions <= 5
+                          ? Colors.orange
+                          : Colors.grey.shade600,
+                      fontWeight: student.remainingSessions <= 5
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              const SizedBox(height: 4),
+              Text(
+                '出勤率 ${(student.attendanceRate * 100).toStringAsFixed(0)}%',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 12,
+                ),
+              ),
             ],
           ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right, color: Colors.grey),
+        ],
+      ),
     );
   }
 
   Widget _buildStatusBadge(StudentStatus status) {
-    Color color;
-    switch (status) {
-      case StudentStatus.active:
-        color = Colors.green;
-        break;
-      case StudentStatus.inactive:
-        color = Colors.orange;
-        break;
-      case StudentStatus.graduated:
-        color = Colors.blue;
-        break;
-      case StudentStatus.suspended:
-        color = Colors.red;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        getStudentStatusName(status),
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+    return ASTag(
+      label: getStudentStatusName(status),
+      type: switch (status) {
+        StudentStatus.active => ASTagType.success,
+        StudentStatus.inactive => ASTagType.warning,
+        StudentStatus.graduated => ASTagType.info,
+        StudentStatus.suspended => ASTagType.error,
+      },
     );
   }
 }

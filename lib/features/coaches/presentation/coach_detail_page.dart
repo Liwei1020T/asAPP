@@ -144,7 +144,7 @@ class _CoachDetailPageState extends ConsumerState<CoachDetailPage> {
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundColor: ASColors.primary.withOpacity(0.12),
+              backgroundColor: ASColors.primary.withValues(alpha: 0.12),
               child: Text(
                 coach.fullName.substring(0, 1),
                 style: const TextStyle(
@@ -346,7 +346,7 @@ class _StatBlock extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color),

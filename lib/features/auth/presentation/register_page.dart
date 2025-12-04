@@ -4,9 +4,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/animations.dart';
+import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/validators.dart';
-import '../../../core/widgets/as_primary_button.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
 
 /// 家长注册页面
@@ -136,51 +137,49 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Widget _buildHeader(ThemeData theme) {
     final primaryColor = theme.colorScheme.primary;
 
-    return Column(
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: primaryColor,
-            borderRadius: BorderRadius.circular(20),
+    return ASGlassContainer.adaptive(
+      padding: const EdgeInsets.all(ASSpacing.xl),
+      blur: ASColors.glassBlurSigma,
+      opacity: 0.9,
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: primaryColor,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.3),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.family_restroom,
+              size: 48,
+              color: Colors.white,
+            ),
           ),
-          child: const Icon(
-            Icons.family_restroom,
-            size: 48,
-            color: Colors.white,
+          const SizedBox(height: ASSpacing.lg),
+          Text(
+            '家长注册',
+            style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
           ),
-        )
-            .animate()
-            .scale(
-              begin: const Offset(0.5, 0.5),
-              end: const Offset(1, 1),
-              duration: ASAnimations.medium,
-              curve: ASAnimations.emphasizeCurve,
-            )
-            .fadeIn(duration: ASAnimations.normal),
-        const SizedBox(height: ASSpacing.lg),
-        Text(
-          '家长注册',
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: primaryColor,
+          const SizedBox(height: ASSpacing.xs),
+          Text(
+            '创建账号以关注孩子的训练动态',
+            style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.textTheme.bodySmall?.color,
+                ),
           ),
-        )
-            .animate(delay: 100.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.3, end: 0),
-        const SizedBox(height: ASSpacing.xs),
-        Text(
-          '创建账号以关注孩子的训练动态',
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: theme.textTheme.bodySmall?.color,
-          ),
-        )
-            .animate(delay: 200.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.3, end: 0),
-      ],
+        ],
+      ),
     );
   }
 
@@ -189,79 +188,59 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 姓名
-        TextFormField(
+        ASTextField(
           controller: _fullNameController,
-          decoration: const InputDecoration(
-            labelText: '姓名',
-            hintText: '请输入您的姓名',
-            prefixIcon: Icon(Icons.person_outlined),
-          ),
+          label: '姓名',
+          hint: '请输入您的姓名',
+          prefixIcon: Icons.person_outlined,
           textInputAction: TextInputAction.next,
           validator: NameValidator.getErrorMessage,
-        )
-            .animate(delay: 300.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideX(begin: -0.1, end: 0),
+        ),
         const SizedBox(height: ASSpacing.lg),
 
         // 邮箱
-        TextFormField(
+        ASTextField(
           controller: _emailController,
-          decoration: const InputDecoration(
-            labelText: '邮箱',
-            hintText: '请输入邮箱地址',
-            prefixIcon: Icon(Icons.email_outlined),
-          ),
+          label: '邮箱',
+          hint: '请输入邮箱地址',
+          prefixIcon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
           validator: EmailValidator.getErrorMessage,
-        )
-            .animate(delay: 350.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideX(begin: -0.1, end: 0),
+        ),
         const SizedBox(height: ASSpacing.lg),
 
         // 手机号
-        TextFormField(
+        ASTextField(
           controller: _phoneController,
-          decoration: const InputDecoration(
-            labelText: '手机号',
-            hintText: '例如：0123456789',
-            prefixIcon: Icon(Icons.phone_outlined),
-            helperText: '用于匹配您孩子的账号',
-          ),
+          label: '手机号',
+          hint: '例如：0123456789',
+          prefixIcon: Icons.phone_outlined,
+          helperText: '用于匹配您孩子的账号',
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
           validator: PhoneValidator.getErrorMessage,
-        )
-            .animate(delay: 400.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideX(begin: -0.1, end: 0),
+        ),
         const SizedBox(height: ASSpacing.lg),
 
         // 密码
-        TextFormField(
+        ASTextField(
           controller: _passwordController,
-          decoration: InputDecoration(
-            labelText: '密码',
-            hintText: '请设置密码',
-            prefixIcon: const Icon(Icons.lock_outlined),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-              ),
-              onPressed: () {
-                setState(() => _obscurePassword = !_obscurePassword);
-              },
-            ),
-          ),
+          label: '密码',
+          hint: '请设置密码',
+          prefixIcon: Icons.lock_outlined,
           obscureText: _obscurePassword,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+            ),
+            onPressed: () {
+              setState(() => _obscurePassword = !_obscurePassword);
+            },
+          ),
           textInputAction: TextInputAction.next,
           validator: PasswordValidator.getErrorMessage,
-        )
-            .animate(delay: 450.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideX(begin: -0.1, end: 0),
+        ),
         const SizedBox(height: ASSpacing.sm),
 
         // 密码强度指示器
@@ -270,35 +249,29 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         const SizedBox(height: ASSpacing.lg),
 
         // 确认密码
-        TextFormField(
+        ASTextField(
           controller: _confirmPasswordController,
-          decoration: InputDecoration(
-            labelText: '确认密码',
-            hintText: '请再次输入密码',
-            prefixIcon: const Icon(Icons.lock_outlined),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscureConfirmPassword
-                    ? Icons.visibility_off
-                    : Icons.visibility,
-              ),
-              onPressed: () {
-                setState(
-                    () => _obscureConfirmPassword = !_obscureConfirmPassword);
-              },
-            ),
-          ),
+          label: '确认密码',
+          hint: '请再次输入密码',
+          prefixIcon: Icons.lock_outlined,
           obscureText: _obscureConfirmPassword,
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+            ),
+            onPressed: () {
+              setState(
+                () => _obscureConfirmPassword = !_obscureConfirmPassword,
+              );
+            },
+          ),
           textInputAction: TextInputAction.done,
           validator: (value) => ConfirmPasswordValidator.validate(
             value,
             _passwordController.text,
           ),
-          onFieldSubmitted: (_) => _register(),
-        )
-            .animate(delay: 500.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideX(begin: -0.1, end: 0),
+          onSubmitted: (_) => _register(),
+        ),
         const SizedBox(height: ASSpacing.xl),
 
         // 注册按钮

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
 import '../constants/spacing.dart';
+import '../constants/animations.dart';
 
 /// 标签类型
 enum ASTagType {
@@ -27,92 +28,194 @@ enum ASTagType {
 }
 
 /// ASP 标签组件
-class ASTag extends StatelessWidget {
+/// 
+/// 支持暗色模式、点击动画
+class ASTag extends StatefulWidget {
   const ASTag({
     super.key,
     required this.label,
     this.type = ASTagType.normal,
     this.icon,
     this.onTap,
+    this.animate = false,
+    this.animationDelay,
   });
 
   final String label;
   final ASTagType type;
   final IconData? icon;
   final VoidCallback? onTap;
+  
+  /// 是否启用入场动画
+  final bool animate;
+  
+  /// 动画延迟
+  final Duration? animationDelay;
 
-  Color get backgroundColor {
-    switch (type) {
-      case ASTagType.normal:
-        return ASColors.divider;
-      case ASTagType.primary:
-        return ASColors.primary.withValues(alpha: 0.1);
-      case ASTagType.success:
-        return ASColors.success.withValues(alpha: 0.1);
-      case ASTagType.warning:
-        return ASColors.warning.withValues(alpha: 0.1);
-      case ASTagType.error:
-        return ASColors.error.withValues(alpha: 0.1);
-      case ASTagType.info:
-        return ASColors.info.withValues(alpha: 0.1);
-      case ASTagType.urgent:
-        return ASColors.error;
+  @override
+  State<ASTag> createState() => _ASTagState();
+}
+
+class _ASTagState extends State<ASTag> with SingleTickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      duration: ASAnimations.fast,
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: ASAnimations.tapScale,
+    ).animate(CurvedAnimation(
+      parent: _scaleController,
+      curve: ASAnimations.defaultCurve,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  void _handleTapDown(TapDownDetails details) {
+    if (widget.onTap != null) {
+      setState(() => _isPressed = true);
+      _scaleController.forward();
     }
   }
 
-  Color get foregroundColor {
-    switch (type) {
+  void _handleTapUp(TapUpDetails details) {
+    if (widget.onTap != null) {
+      setState(() => _isPressed = false);
+      _scaleController.reverse();
+    }
+  }
+
+  void _handleTapCancel() {
+    if (widget.onTap != null) {
+      setState(() => _isPressed = false);
+      _scaleController.reverse();
+    }
+  }
+
+  Color _getBackgroundColor(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+    
+    switch (widget.type) {
       case ASTagType.normal:
-        return ASColors.textSecondary;
+        return isDark 
+            ? colorScheme.surfaceContainerHighest 
+            : ASColors.divider;
       case ASTagType.primary:
-        return ASColors.primary;
+        return colorScheme.primary.withValues(alpha: isDark ? 0.2 : 0.1);
       case ASTagType.success:
-        return ASColors.success;
+        return ASColors.success.withValues(alpha: isDark ? 0.2 : 0.1);
       case ASTagType.warning:
-        return const Color(0xFFE65100); // 深橙色，warning 的对比色
+        return ASColors.warning.withValues(alpha: isDark ? 0.2 : 0.1);
       case ASTagType.error:
-        return ASColors.error;
+        return colorScheme.error.withValues(alpha: isDark ? 0.2 : 0.1);
       case ASTagType.info:
-        return ASColors.info;
+        return ASColors.info.withValues(alpha: isDark ? 0.2 : 0.1);
       case ASTagType.urgent:
-        return ASColors.textOnPrimary;
+        return colorScheme.error;
+    }
+  }
+
+  Color _getForegroundColor(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+    
+    switch (widget.type) {
+      case ASTagType.normal:
+        return isDark 
+            ? colorScheme.onSurfaceVariant 
+            : ASColors.textSecondary;
+      case ASTagType.primary:
+        return colorScheme.primary;
+      case ASTagType.success:
+        return isDark ? const Color(0xFF81C784) : ASColors.success;
+      case ASTagType.warning:
+        return isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
+      case ASTagType.error:
+        return colorScheme.error;
+      case ASTagType.info:
+        return isDark ? const Color(0xFF64B5F6) : ASColors.info;
+      case ASTagType.urgent:
+        return colorScheme.onError;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final tag = Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: ASSpacing.sm,
-        vertical: ASSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(ASSpacing.tagRadius),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 12, color: foregroundColor),
-            const SizedBox(width: ASSpacing.xs),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: foregroundColor,
+    final bgColor = _getBackgroundColor(context);
+    final fgColor = _getForegroundColor(context);
+    
+    Widget tag = AnimatedBuilder(
+      animation: _scaleAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: child,
+        );
+      },
+      child: AnimatedContainer(
+        duration: ASAnimations.fast,
+        padding: const EdgeInsets.symmetric(
+          horizontal: ASSpacing.sm,
+          vertical: ASSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(ASSpacing.tagRadius),
+          boxShadow: _isPressed
+              ? null
+              : [
+                  BoxShadow(
+                    color: bgColor.withValues(alpha: 0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.icon != null) ...[
+              Icon(widget.icon, size: 12, color: fgColor),
+              const SizedBox(width: ASSpacing.xs),
+            ],
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: fgColor,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: tag,
+    if (widget.onTap != null) {
+      tag = GestureDetector(
+        onTapDown: _handleTapDown,
+        onTapUp: _handleTapUp,
+        onTapCancel: _handleTapCancel,
+        onTap: widget.onTap,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: tag,
+        ),
       );
     }
 

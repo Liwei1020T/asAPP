@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -70,7 +68,7 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
                 children: [
                   const ASSkeletonStatCard(),
                   const SizedBox(height: ASSpacing.lg),
-                  ASSkeletonList(itemCount: 4, hasAvatar: false),
+                  const ASSkeletonList(itemCount: 4, hasAvatar: false),
                 ],
               ),
             );
@@ -118,9 +116,11 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
   }
 
   Widget _buildMonthSelector() {
-    return Container(
-      padding: const EdgeInsets.all(ASSpacing.md),
-      color: ASColors.primary.withValues(alpha: 0.05),
+    return ASCard.glass(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ASSpacing.lg,
+        vertical: ASSpacing.md,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -150,68 +150,47 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
 
   Widget _buildSalarySummary(Profile? currentUser, double totalSalary, int totalSessions) {
     final rate = currentUser?.ratePerSession ?? 0;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
 
-    return ASCard(
-      animate: true,
-      child: Column(
-        children: [
-          // 总金额
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: ASSpacing.lg),
-            child: Column(
-              children: [
-                Text(
-                  'RM ${totalSalary.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: ASColors.primary,
-                  ),
-                ),
-                const SizedBox(height: ASSpacing.xs),
-                Text(
-                  '${DateFormatters.month(_selectedMonth)} 预计收入',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: secondaryColor,
-                  ),
-                ),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ASStatCard(
+          title: '${DateFormatters.month(_selectedMonth)} 预计收入',
+          valueText: 'RM ${totalSalary.toStringAsFixed(2)}',
+          subtitle: '含已完成课时',
+          icon: Icons.account_balance_wallet,
+          color: ASColors.success,
+          animateValue: false,
+          animationIndex: 0,
+        ),
+        const SizedBox(height: ASSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: ASStatCard(
+                title: '已上课时',
+                value: totalSessions,
+                subtitle: '本月完成',
+                icon: Icons.event_available,
+                color: ASColors.primary,
+                animationIndex: 1,
+              ),
             ),
-          ),
-          const Divider(),
-
-          // 统计数据
-          Padding(
-            padding: const EdgeInsets.all(ASSpacing.md),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _StatColumn(
-                    label: '已上课时',
-                    value: '$totalSessions',
-                    unit: '节',
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  color: ASColors.divider,
-                ),
-                Expanded(
-                  child: _StatColumn(
-                    label: '课时单价',
-                    value: 'RM ${rate.toStringAsFixed(0)}',
-                    unit: '',
-                  ),
-                ),
-              ],
+            const SizedBox(width: ASSpacing.md),
+            Expanded(
+              child: ASStatCard(
+                title: '课时单价',
+                valueText: 'RM ${rate.toStringAsFixed(0)}',
+                subtitle: '来自个人资料',
+                icon: Icons.payments,
+                color: ASColors.info,
+                animateValue: false,
+                animationIndex: 2,
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -257,30 +236,11 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
   }
 
   Widget _buildEmptyState() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
-    
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(ASSpacing.xl),
-        child: Column(
-          children: [
-            Icon(Icons.event_busy, size: 64, color: hintColor)
-                .animate()
-                .fadeIn(duration: ASAnimations.normal)
-                .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1)),
-            const SizedBox(height: ASSpacing.md),
-            Text(
-              '本月暂无课时记录',
-              style: TextStyle(
-                fontSize: 16,
-                color: secondaryColor,
-              ),
-            ).animate().fadeIn(duration: ASAnimations.normal, delay: 100.ms),
-          ],
-        ),
-      ),
+    return const ASEmptyState(
+      type: ASEmptyStateType.noData,
+      title: '本月暂无课时记录',
+      description: '完成授课后这里会展示收入明细',
+      icon: Icons.event_busy,
     );
   }
 

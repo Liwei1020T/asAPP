@@ -22,7 +22,93 @@ import '../../features/timeline/presentation/timeline_list_page.dart';
 import '../../features/playbook/presentation/playbook_list_page.dart';
 import '../../features/salary/presentation/salary_page.dart';
 import '../../features/students/presentation/student_list_page.dart';
+import '../../features/profile/presentation/profile_page.dart';
 import '../widgets/app_shell.dart';
+import '../constants/animations.dart';
+
+/// 页面转场动画构建器
+CustomTransitionPage<T> _buildPageWithTransition<T>({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: ASAnimations.pageTransition,
+    reverseTransitionDuration: ASAnimations.normal,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      // 淡入 + 向上滑动 + 轻微缩放
+      final fadeAnimation = CurvedAnimation(
+        parent: animation,
+        curve: ASAnimations.pageEnterCurve,
+      );
+      
+      final slideAnimation = Tween<Offset>(
+        begin: const Offset(0, 0.05),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: animation,
+        curve: ASAnimations.pageEnterCurve,
+      ));
+      
+      final scaleAnimation = Tween<double>(
+        begin: 0.98,
+        end: 1.0,
+      ).animate(CurvedAnimation(
+        parent: animation,
+        curve: ASAnimations.pageEnterCurve,
+      ));
+      
+      return FadeTransition(
+        opacity: fadeAnimation,
+        child: SlideTransition(
+          position: slideAnimation,
+          child: ScaleTransition(
+            scale: scaleAnimation,
+            child: child,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// 模态页面转场（用于登录、注册等）
+CustomTransitionPage<T> _buildModalPageTransition<T>({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: ASAnimations.medium,
+    reverseTransitionDuration: ASAnimations.normal,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final fadeAnimation = CurvedAnimation(
+        parent: animation,
+        curve: ASAnimations.smoothCurve,
+      );
+      
+      final slideAnimation = Tween<Offset>(
+        begin: const Offset(0, 0.1),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: animation,
+        curve: ASAnimations.dialogCurve,
+      ));
+      
+      return FadeTransition(
+        opacity: fadeAnimation,
+        child: SlideTransition(
+          position: slideAnimation,
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 /// 路由配置 Provider
 final routerProvider = Provider<GoRouter>((ref) {
@@ -66,25 +152,37 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginPage(),
+        pageBuilder: (context, state) => _buildModalPageTransition(
+          context: context,
+          state: state,
+          child: const LoginPage(),
+        ),
       ),
 
       // 注册页
       GoRoute(
         path: '/register',
         name: 'register',
-        builder: (context, state) => const RegisterPage(),
+        pageBuilder: (context, state) => _buildModalPageTransition(
+          context: context,
+          state: state,
+          child: const RegisterPage(),
+        ),
       ),
 
       // 邮箱验证页
       GoRoute(
         path: '/verify-email',
         name: 'verify-email',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          return EmailVerificationPage(
-            email: extra?['email'] ?? '',
-            phoneNumber: extra?['phoneNumber'] ?? '',
+          return _buildModalPageTransition(
+            context: context,
+            state: state,
+            child: EmailVerificationPage(
+              email: extra?['email'] ?? '',
+              phoneNumber: extra?['phoneNumber'] ?? '',
+            ),
           );
         },
       ),
@@ -93,12 +191,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/link-children',
         name: 'link-children',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          return LinkChildrenPage(
-            phoneNumber: extra?['phoneNumber'] ?? '',
+          return _buildModalPageTransition(
+            context: context,
+            state: state,
+            child: LinkChildrenPage(
+              phoneNumber: extra?['phoneNumber'] ?? '',
+            ),
           );
         },
+      ),
+
+      // 个人资料页（通用）
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const ProfilePage(),
+        ),
       ),
 
       // 教练 Shell Route
@@ -141,22 +254,38 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/coach-dashboard',
             name: 'coach-dashboard',
-            builder: (context, state) => const CoachDashboardPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const CoachDashboardPage(),
+            ),
           ),
           GoRoute(
             path: '/coach/timeline',
             name: 'coach-timeline',
-            builder: (context, state) => const TimelineListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const TimelineListPage(),
+            ),
           ),
           GoRoute(
             path: '/coach/playbook',
             name: 'coach-playbook',
-            builder: (context, state) => const PlaybookListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const PlaybookListPage(),
+            ),
           ),
           GoRoute(
             path: '/salary',
             name: 'salary',
-            builder: (context, state) => const SalaryPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const SalaryPage(),
+            ),
           ),
         ],
       ),
@@ -195,17 +324,29 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/parent-dashboard',
             name: 'parent-dashboard',
-            builder: (context, state) => const ParentDashboardPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const ParentDashboardPage(),
+            ),
           ),
           GoRoute(
             path: '/parent/timeline',
             name: 'parent-timeline',
-            builder: (context, state) => const TimelineListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const TimelineListPage(),
+            ),
           ),
           GoRoute(
             path: '/parent/playbook',
             name: 'parent-playbook',
-            builder: (context, state) => const PlaybookListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const PlaybookListPage(),
+            ),
           ),
         ],
       ),
@@ -268,19 +409,31 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin-dashboard',
             name: 'admin-dashboard',
-            builder: (context, state) => const AdminDashboardPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const AdminDashboardPage(),
+            ),
           ),
           GoRoute(
             path: '/admin/classes',
             name: 'admin-classes',
-            builder: (context, state) => const AdminClassListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const AdminClassListPage(),
+            ),
             routes: [
               GoRoute(
                 path: ':classId',
                 name: 'admin-class-detail',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final classId = state.pathParameters['classId']!;
-                  return AdminClassDetailPage(classId: classId);
+                  return _buildPageWithTransition(
+                    context: context,
+                    state: state,
+                    child: AdminClassDetailPage(classId: classId),
+                  );
                 },
               ),
             ],
@@ -288,14 +441,22 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/coaches',
             name: 'admin-coaches',
-            builder: (context, state) => const CoachListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const CoachListPage(),
+            ),
             routes: [
               GoRoute(
                 path: ':coachId',
                 name: 'admin-coach-detail',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final coachId = state.pathParameters['coachId']!;
-                  return CoachDetailPage(coachId: coachId);
+                  return _buildPageWithTransition(
+                    context: context,
+                    state: state,
+                    child: CoachDetailPage(coachId: coachId),
+                  );
                 },
               ),
             ],
@@ -303,22 +464,38 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/notices',
             name: 'admin-notices',
-            builder: (context, state) => const NoticeListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const NoticeListPage(),
+            ),
           ),
           GoRoute(
             path: '/students',
             name: 'students',
-            builder: (context, state) => const StudentListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const StudentListPage(),
+            ),
           ),
           GoRoute(
             path: '/admin/timeline',
             name: 'admin-timeline',
-            builder: (context, state) => const TimelineListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const TimelineListPage(),
+            ),
           ),
           GoRoute(
             path: '/admin/playbook',
             name: 'admin-playbook',
-            builder: (context, state) => const PlaybookListPage(),
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const PlaybookListPage(),
+            ),
           ),
         ],
       ),
@@ -340,9 +517,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/attendance/:sessionId',
         name: 'attendance',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final sessionId = state.pathParameters['sessionId']!;
-          return AttendancePage(sessionId: sessionId);
+          return _buildPageWithTransition(
+            context: context,
+            state: state,
+            child: AttendancePage(sessionId: sessionId),
+          );
         },
       ),
       
@@ -454,6 +635,7 @@ String _getDashboardRouteForRole(UserRole role) {
 
 /// 简易路由权限校验
 bool _isAuthorized(UserRole role, String location) {
+  if (location.startsWith('/profile')) return true;
   if (role == UserRole.admin) return true;
 
   if (role == UserRole.coach) {
@@ -461,14 +643,16 @@ bool _isAuthorized(UserRole role, String location) {
         location.startsWith('/attendance') ||
         location.startsWith('/salary') ||
         location.startsWith('/coach/timeline') ||
-        location.startsWith('/coach/playbook');
+        location.startsWith('/coach/playbook') ||
+        location.startsWith('/profile');
   }
 
   if (role == UserRole.parent || role == UserRole.student) {
     return location.startsWith('/parent-dashboard') ||
         location.startsWith('/parent/timeline') ||
         location.startsWith('/parent/playbook') ||
-        location.startsWith('/link-children');
+        location.startsWith('/link-children') ||
+        location.startsWith('/profile');
   }
 
   return false;

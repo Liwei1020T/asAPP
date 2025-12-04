@@ -14,9 +14,10 @@ class SupabaseSessionsRepository {
     final data = await supabaseClient
         .from('sessions')
         .select()
-        .eq('coach_id', coachId)
+        .or('coach_id.eq.$coachId,actual_coach_id.eq.$coachId')
         .gte('start_time', start.toIso8601String())
         .lt('start_time', end.toIso8601String())
+        .not('status', 'eq', SessionStatus.cancelled.name)
         .order('start_time', ascending: true);
 
     return data.map((e) => _mapSession(e)).toList();
@@ -28,8 +29,8 @@ class SupabaseSessionsRepository {
     final data = await supabaseClient
         .from('sessions')
         .select()
-        .eq('coach_id', coachId)
-        .eq('status', SessionStatus.scheduled.name)
+        .or('coach_id.eq.$coachId,actual_coach_id.eq.$coachId')
+        .not('status', 'eq', SessionStatus.cancelled.name)
         .gt('start_time', now)
         .order('start_time', ascending: true)
         .limit(limit);
