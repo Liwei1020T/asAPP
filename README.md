@@ -1,156 +1,165 @@
 # ArtSport Management System (ASP-MS)
 
-ASP-MS 是一个专为 Art Sport Penang 羽毛球学院打造的综合管理系统。该系统基于 Flutter Web (PWA) 构建，采用现代化的 Clean Architecture 架构，旨在为管理员、教练、家长和学员提供高效、流畅的管理与交互体验。
+ASP-MS is a comprehensive management system designed specifically for Art Sport Penang Badminton Academy. Built with Flutter Web (PWA) and adopting a modern Clean Architecture, it aims to provide an efficient and seamless management and interaction experience for administrators, coaches, parents, and students.
 
-## 🌟 核心功能
+## 🌟 Core Features
 
-系统围绕四大核心角色（管理员、教练、家长、学员）设计，涵盖以下主要模块：
+The system is designed around four core roles (Admin, Coach, Parent, Student) and covers the following main modules:
 
-*   **🔐 身份认证与权限管理**
-    *   支持多角色登录（Admin, Coach, Parent, Student）。
-    *   基于 Supabase Auth 的安全认证。
-    *   基于角色的访问控制（RBAC）。
+*   **🔐 Authentication & Permissions**
+    *   Multi-role login support (Admin, Coach, Parent, Student).
+    *   Secure authentication based on Supabase Auth.
+    *   Role-Based Access Control (RBAC).
 
-*   **📊 仪表板 (Dashboard)**
-    *   **管理员**：全局数据概览、快捷操作入口。
-    *   **教练**：今日课程、待办事项、收入概览。
-    *   **家长/学员**：课程表、出勤记录、最新动态。
+*   **📊 Dashboard**
+    *   **Admin**: Global data overview, quick access shortcuts.
+    *   **Coach**: View **all** upcoming sessions (not just assigned ones), to-do list, income overview.
+    *   **Parent/Student**: Class schedule, attendance records, latest updates.
 
-*   **📅 课程与出勤管理**
-    *   **班级管理**：创建不同等级的班级（基础/进阶），设置时间、场地和默认教练。
-    *   **排课系统**：自动生成课程 Session，支持临时调整。
-    *   **实时点名**：教练端快速点名（出席/缺席/迟到/请假），支持添加评价与 AI 反馈。
+*   **📅 Class & Attendance Management**
+    *   **Class Management**: Create classes of different levels (Basic/Advanced), set schedules, venues, and default coaches.
+    *   **Flexible Scheduling**:
+        *   **Batch Scheduling**: Automatically generate course sessions for a date range (even without a default coach).
+        *   **Unassigned Sessions**: Create sessions without a specific coach (visible to all, claimable by clocking in).
+        *   Support for ad-hoc adjustments.
+    *   **Real-time Attendance**: Coaches can quickly take attendance (Present/Absent/Late/Leave) and add evaluations with AI feedback.
+    *   **Smart Clock-In**: Coaches automatically clock in when starting a class, claiming the session if it was unassigned.
 
-*   **� 人员管理**
-    *   **学员档案**：管理学员基本信息、剩余课时、家长关联。
-    *   **教练档案**：管理教练信息、课时费率。
+*   **👥 Personnel Management**
+    *   **Student Profiles**: Manage student basic info, remaining sessions, and parent associations.
+    *   **Coach Profiles**: Manage coach info and session rates.
 
-*   **💰 薪资与财务**
-    *   **自动计算**：根据教练完成的课时和费率自动计算月度薪资。
-    *   **薪资报表**：按月查看收入明细。
+*   **💰 Salary & Finance**
+    *   **Automatic Calculation**: Automatically calculate monthly salaries based on completed sessions and rates.
+    *   **Salary Reports**: View detailed monthly income breakdowns.
 
-*   **📢 沟通与互动**
-    *   **训练动态 (Timeline)**：类似社交媒体的动态流，教练发布训练照片/视频，家长点赞互动。
-    *   **公告系统 (Notices)**：发布重要通知（放假安排、比赛信息），支持置顶和紧急标记。
-    *   **训练手册 (Playbook)**：共享教学资料（视频/文档），支持分类管理。
+*   **📢 Communication & Interaction**
+    *   **Timeline**: A social media-like feed where coaches post training photos/videos and parents can like and comment.
+    *   **Notices**: Publish important announcements (holidays, tournaments) with support for pinning and urgent marking.
+    *   **Playbook**: Shared teaching materials (videos/documents) with category management.
 
-## 🛠 技术栈
+## 🛠 Tech Stack
 
-本项目采用 Flutter 生态中最前沿的技术组合：
+This project utilizes the cutting-edge technology stack within the Flutter ecosystem:
 
-*   **前端框架**: [Flutter](https://flutter.dev/) (Web / PWA)
-*   **语言**: Dart 3.x
-*   **状态管理**: [Riverpod 2.x/3.x](https://riverpod.dev/) (Generator语法)
-*   **路由管理**: [GoRouter](https://pub.dev/packages/go_router)
-*   **后端服务**: [Supabase](https://supabase.com/) (PostgreSQL + Auth + Storage + Realtime)
-*   **UI 组件库**: Material 3 Design
-*   **动画效果**: [flutter_animate](https://pub.dev/packages/flutter_animate)
-*   **骨架屏**: [shimmer](https://pub.dev/packages/shimmer)
-*   **工具库**:
-    *   `intl`: 日期格式化与国际化
-    *   `shared_preferences`: 本地配置存储
-    *   `file_picker`: 文件上传
+*   **Frontend Framework**: [Flutter](https://flutter.dev/) (Web / PWA)
+*   **Language**: Dart 3.x
+*   **State Management**: [Riverpod 2.x/3.x](https://riverpod.dev/) (Generator syntax)
+*   **Routing**: [GoRouter](https://pub.dev/packages/go_router)
+*   **Backend Service**: [Supabase](https://supabase.com/) (PostgreSQL + Auth + Storage + Realtime)
+*   **UI Component Library**: Material 3 Design with Custom Premium System
+*   **Animations**: [flutter_animate](https://pub.dev/packages/flutter_animate)
+*   **Skeleton Screens**: [shimmer](https://pub.dev/packages/shimmer)
+*   **Utilities**:
+    *   `intl`: Date formatting and internationalization
+    *   `shared_preferences`: Local configuration storage
+    *   `file_picker`: File uploading
 
-## 📂 项目结构
+## 📂 Project Structure
 
-项目遵循 **Clean Architecture** 分层架构，确保代码的可维护性与可扩展性：
+The project follows the **Clean Architecture** layered approach to ensure code maintainability and scalability:
 
 ```
 lib/
-├── core/                   # 核心共享模块
-│   ├── config/             # 全局配置 (Supabase等)
-│   ├── constants/          # 常量 (颜色、间距、动画参数)
-│   ├── router/             # 路由配置 (AppRouter)
-│   ├── theme/              # 主题定义 (Light/Dark Mode)
-│   ├── utils/              # 工具类 (日期处理、响应式工具)
-│   └── widgets/            # 通用 UI 组件 (ASCard, ASButton等)
-├── data/                   # 数据层
-│   ├── models/             # 数据模型 (Dart Data Classes)
-│   └── repositories/       # 数据仓库 (Supabase API 调用)
-├── features/               # 业务功能模块
-│   ├── auth/               # 认证 (登录/注册)
-│   ├── dashboard/          # 各角色仪表板
-│   ├── classes/            # 班级与课程
-│   ├── attendance/         # 出勤点名
-│   ├── students/           # 学员管理
-│   ├── coaches/            # 教练管理
-│   ├── salary/             # 薪资管理
-│   ├── timeline/           # 训练动态
-│   ├── playbook/           # 训练手册
-│   └── notices/            # 公告通知
-└── main.dart               # 应用入口
+├── core/                   # Core shared modules
+│   ├── config/             # Global config (Supabase, etc.)
+│   ├── constants/          # Constants (Colors, Spacing, Animations)
+│   ├── router/             # Router configuration (AppRouter)
+│   ├── theme/              # Theme definitions (Light/Dark Mode)
+│   ├── utils/              # Utilities (Date formatting, Responsive utils)
+│   └── widgets/            # Common UI components (ASCard, ASButton, etc.)
+├── data/                   # Data Layer
+│   ├── models/             # Data Models (Dart Data Classes)
+│   └── repositories/       # Repositories (Supabase API calls)
+├── features/               # Business Features
+│   ├── auth/               # Authentication (Login/Register)
+│   ├── dashboard/          # Role-based Dashboards
+│   ├── classes/            # Classes & Sessions
+│   ├── attendance/         # Attendance Taking
+│   ├── students/           # Student Management
+│   ├── coaches/            # Coach Management
+│   ├── salary/             # Salary Management
+│   ├── timeline/           # Training Timeline
+│   ├── playbook/           # Training Playbook
+│   └── notices/            # Announcements
+└── main.dart               # App Entry Point
 ```
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 1. 环境准备
+### 1. Prerequisites
 
-*   Flutter SDK (推荐 3.10+)
+*   Flutter SDK (Recommended 3.10+)
 *   Git
 
-### 2. 获取代码
+### 2. Get the Code
 
 ```bash
 git clone <repository_url>
 cd asp_ms
 ```
 
-### 3. 安装依赖
+### 3. Install Dependencies
 
 ```bash
 flutter pub get
 ```
 
-### 4. Supabase 配置
+### 4. Supabase Configuration
 
-1.  创建一个新的 [Supabase](https://supabase.com/) 项目。
-2.  在 Supabase SQL Editor 中运行项目根目录下的 `populate_data.sql` 脚本。该脚本会：
-    *   创建所有必要的数据表 (Profiles, Sessions, Attendance 等)。
-    *   设置 Row Level Security (RLS) 策略。
-    *   创建测试用户和初始数据。
-3.  配置 Storage Buckets：
-    *   创建名为 `timeline` 的公开 bucket。
-    *   创建名为 `playbook` 的公开 bucket。
-4.  在 `lib/core/config/supabase_config.dart` (或相应配置文件) 中填入你的 `SUPABASE_URL` 和 `SUPABASE_ANON_KEY`。
+1.  Create a new [Supabase](https://supabase.com/) project.
+2.  **Schema Setup**: Run the `dataSetUp.sql` script (located in the project root) in your Supabase SQL Editor. This script will:
+    *   Create all necessary tables (Profiles, Sessions, Attendance, etc.).
+    *   Set up Row Level Security (RLS) policies.
+    *   Create test users and initial data.
+3.  **Storage Setup**: Run the `supabase/create_buckets.sql` script to set up storage:
+    *   Creates `timeline` and `playbook` buckets.
+    *   Configures public access policies.
+4.  **Essential Fixes & Updates**: Run the following scripts in order to ensure correct functionality:
+    *   `supabase/fix_attendance_trigger.sql`: Fixes remaining session deduction logic.
+    *   `supabase/fix_coach_shifts_fk.sql`: Fixes foreign key constraints for class deletion.
+    *   `supabase/update_sessions_rls.sql`: Updates RLS to allow coaches to claim unassigned sessions.
+    *   `supabase/remove_duplicate_sessions.sql`: (Optional) Cleans up any duplicate sessions.
+5.  Enter your `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `lib/main.dart` (or your environment configuration file).
 
-### 5. 运行项目
+### 5. Run the Project
 
 ```bash
-# 运行在 Chrome
+# Run in Chrome
 flutter run -d chrome --web-port=8080
 ```
 
-访问 [http://localhost:8080](http://localhost:8080) 即可看到应用。
+Visit [http://localhost:8080](http://localhost:8080) to see the application.
 
-## 🧪 测试账号
+## 🧪 Test Accounts
 
-`populate_data.sql` 脚本默认创建了以下测试账号（密码均为 `password123`）：
+The `dataSetUp.sql` script creates the following test accounts by default (Password for all is `password123`):
 
-| 角色 | 邮箱 | 说明 |
-|------|------|------|
-| **教练** | `mike@example.com` | 资深教练，已有排课数据 |
-| **教练** | `sarah@example.com` | 中级教练 |
-| **学员** | `alice@example.com` | 基础班学员 |
-| **学员** | `bob@example.com` | 进阶班学员 |
+| Role | Email | Description |
+|------|-------|-------------|
+| **Coach** | `mike@example.com` | Senior coach with existing schedule data |
+| **Coach** | `sarah@example.com` | Intermediate coach |
+| **Student** | `alice@example.com` | Basic level student |
+| **Student** | `bob@example.com` | Advanced level student |
 
-> **注意**: 管理员账号需要在 Supabase Auth 中手动创建用户，并在 `profiles` 表中将其 `role` 设置为 `admin`。
+> **Note**: Admin accounts need to be manually created in Supabase Auth, and then have their `role` set to `admin` in the `profiles` table.
 
-## 🎨 UI/UX 特性
+## 🎨 UI/UX Features
 
-*   **响应式设计**: 完美适配 Desktop, Tablet 和 Mobile 设备。
-*   **深色模式**: 支持系统自动切换或手动切换深色/浅色主题。
-*   **交互动画**: 列表项错落入场、按钮点击反馈、卡片悬停效果，提升用户体验。
+*   **Responsive Design**: Perfectly adapted for Desktop, Tablet, and Mobile devices.
+*   **Dark Mode**: Supports system automatic switching or manual toggle between Light/Dark themes.
+*   **Interactive Animations**: Staggered list entries, button feedback, and card hover effects to enhance user experience.
 
-## 📝 数据库设计 (Schema)
+## 📝 Database Design (Schema)
 
-核心数据表关系如下：
+Key data table relationships:
 
-*   **profiles**: 用户档案 (关联 auth.users)
-*   **class_groups**: 班级定义
-*   **sessions**: 具体课次 (关联 class_groups, coaches, venues)
-*   **attendance**: 出勤记录 (关联 sessions, students)
-*   **coach_shifts**: 教练排班记录
-*   **timeline_posts**: 动态帖子
-*   **notices**: 系统公告
+*   **profiles**: User profiles (linked to auth.users)
+*   **class_groups**: Class definitions
+*   **sessions**: Specific class sessions (linked to class_groups, coaches, venues)
+*   **attendance**: Attendance records (linked to sessions, students)
+*   **coach_shifts**: Coach shift records
+*   **timeline_posts**: Timeline posts
+*   **notices**: System announcements
 
-详细 SQL 定义请参考 `populate_data.sql`。
+For detailed SQL definitions, please refer to `dataSetUp.sql`.

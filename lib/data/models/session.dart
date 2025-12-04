@@ -9,7 +9,7 @@ enum SessionStatus {
 class Session {
   final String id;
   final String classId;
-  final String coachId;
+  final String? coachId;
   final String? title;
   final String? venue;
   final String? venueId;
@@ -27,7 +27,7 @@ class Session {
   const Session({
     required this.id,
     required this.classId,
-    required this.coachId,
+    this.coachId,
     this.title,
     this.venue,
     this.venueId,
@@ -45,7 +45,7 @@ class Session {
     return Session(
       id: json['id'] as String,
       classId: json['class_id'] as String,
-      coachId: json['coach_id'] as String,
+      coachId: json['coach_id'] as String?,
       title: json['title'] as String?,
       venue: json['venue'] as String?,
       venueId: json['venue_id'] as String?,

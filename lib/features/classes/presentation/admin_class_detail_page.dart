@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +15,7 @@ import '../../../data/repositories/supabase/auth_repository.dart';
 import '../../../data/repositories/supabase/student_repository.dart';
 import '../../../data/repositories/supabase/venues_repository.dart';
 import 'select_student_dialog.dart';
+import 'batch_schedule_dialog.dart';
 
 /// 管理员 - 班级详情页
 class AdminClassDetailPage extends ConsumerStatefulWidget {
@@ -37,6 +39,9 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // Rebuild to update AppBar actions
+    });
     _loadData();
   }
 
@@ -106,6 +111,21 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          AnimatedBuilder(
+            animation: _tabController,
+            builder: (context, child) {
+              if (_tabController.index == 1) {
+                return IconButton(
+                  icon: const Icon(Icons.calendar_month),
+                  tooltip: '批量排课',
+                  onPressed: _showBatchScheduleDialog,
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -143,19 +163,24 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
                 ),
               ],
             ),
-      floatingActionButton: _tabController.index == 1
-          ? FloatingActionButton.extended(
-              onPressed: _showCreateSessionDialog,
-              backgroundColor: ASColors.primary,
-              icon: const Icon(Icons.add),
-              label: const Text('排课'),
-            )
-          : FloatingActionButton.extended(
-              onPressed: _showAddStudentDialog,
-              backgroundColor: ASColors.primary,
-              icon: const Icon(Icons.person_add),
-              label: const Text('添加学员'),
-            ),
+      floatingActionButton: AnimatedBuilder(
+        animation: _tabController,
+        builder: (context, child) {
+          return _tabController.index == 1
+              ? FloatingActionButton.extended(
+                  onPressed: _showCreateSessionDialog,
+                  backgroundColor: ASColors.primary,
+                  icon: const Icon(Icons.add),
+                  label: const Text('排课'),
+                )
+              : FloatingActionButton.extended(
+                  onPressed: _showAddStudentDialog,
+                  backgroundColor: ASColors.primary,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('添加学员'),
+                );
+        },
+      ),
     );
   }
 
@@ -236,6 +261,19 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
     return '$day $startTime-$endTime';
   }
 
+  Future<void> _showBatchScheduleDialog() async {
+    if (_classGroup == null) return;
+    final result = await BatchScheduleDialog.show(context, _classGroup!);
+    if (result == true) {
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('批量排课成功')),
+        );
+      }
+    }
+  }
+
   Future<void> _showCreateSessionDialog() async {
     if (_classGroup == null) return;
     final session = await _CreateSessionDialog.show(
@@ -255,16 +293,18 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
   }
 
   Future<void> _showAddStudentDialog() async {
-    final student = await SelectStudentDialog.show(context, _students);
-    if (student == null || _classGroup == null) return;
+    final students = await SelectStudentDialog.show(context, _students);
+    if (students == null || students.isEmpty || _classGroup == null) return;
 
-    await ref
-        .read(supabaseClassesRepositoryProvider)
-        .addStudentToClass(_classGroup!.id, student.id);
+    final repo = ref.read(supabaseClassesRepositoryProvider);
+    for (final student in students) {
+      await repo.addStudentToClass(_classGroup!.id, student.id);
+    }
+    
     await _loadData();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已添加 ${student.fullName}')),
+        SnackBar(content: Text('已添加 ${students.length} 名学员')),
       );
     }
   }
@@ -760,18 +800,22 @@ class _CreateSessionDialogState extends ConsumerState<_CreateSessionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final coachDropdown = DropdownButtonFormField<String>(
+    final coachDropdown = DropdownButtonFormField<String?>(
       value: _coachId,
       decoration: const InputDecoration(
         labelText: '教练',
         border: OutlineInputBorder(),
       ),
-      items: _coaches
-          .map((c) => DropdownMenuItem(
-                value: c.id,
-                child: Text(c.fullName),
-              ))
-          .toList(),
+      items: [
+        const DropdownMenuItem(
+          value: null,
+          child: Text('不指定教练 (所有教练可见)'),
+        ),
+        ..._coaches.map((c) => DropdownMenuItem(
+              value: c.id,
+              child: Text(c.fullName),
+            )),
+      ],
       onChanged: (v) => setState(() => _coachId = v),
     );
 
@@ -987,7 +1031,7 @@ class _CreateSessionDialogState extends ConsumerState<_CreateSessionDialog> {
     final session = Session(
       id: widget.initialSession?.id ?? '', // Supabase 会生成 UUID
       classId: widget.classGroup.id,
-      coachId: _coachId ?? widget.classGroup.defaultCoachId ?? 'coach-unknown',
+      coachId: _coachId ?? widget.classGroup.defaultCoachId,
       title: _titleController.text.trim(),
       venue: _selectedVenue?.name ?? _venueController.text.trim(),
       venueId: _selectedVenue?.id,
@@ -1010,8 +1054,10 @@ class _CreateSessionDialogState extends ConsumerState<_CreateSessionDialog> {
     } catch (_) {
       setState(() => _coaches = []);
     }
-    if (_coaches.isNotEmpty && _coachId == null) {
-      setState(() => _coachId = _coaches.first.id);
+    if (_coaches.isNotEmpty && _coachId == null && widget.initialSession == null) {
+      // If creating new session and class has default coach, use it.
+      // Otherwise leave it null (No Coach).
+      _coachId = widget.classGroup.defaultCoachId;
     }
   }
 

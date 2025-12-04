@@ -542,6 +542,7 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
     StudentLevel selectedLevel = student?.level ?? StudentLevel.beginner;
     String selectedGender = student?.gender ?? '男';
     DateTime? selectedBirthDate = student?.birthDate;
+    StudentStatus selectedStatus = student?.status ?? StudentStatus.active;
 
     showDialog(
       context: context,
@@ -659,6 +660,29 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (isEditing) ...[
+                  DropdownButtonFormField<StudentStatus>(
+                    value: selectedStatus,
+                    decoration: const InputDecoration(
+                      labelText: '状态',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: StudentStatus.values.map((status) {
+                      return DropdownMenuItem(
+                        value: status,
+                        child: Text(getStudentStatusName(status)),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() {
+                          selectedStatus = value;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 TextFormField(
                   controller: parentNameController,
                   decoration: const InputDecoration(
@@ -764,6 +788,7 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
                           selectedBirthDate!,
                           totalSessions: total,
                           remainingSessions: remaining,
+                          status: selectedStatus,
                         );
                         await _saveStudent(newStudent, isEditing);
                       },
@@ -788,7 +813,7 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
     String parentName,
     String emergencyPhone,
     DateTime birthDate,
-    {required int totalSessions, required int remainingSessions}
+    {required int totalSessions, required int remainingSessions, required StudentStatus status}
   ) {
     final now = DateTime.now();
     return Student(
@@ -796,7 +821,7 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
       fullName: name,
       gender: gender,
       level: level,
-      status: original?.status ?? StudentStatus.active,
+      status: status,
       parentName: parentName.isEmpty ? null : parentName,
       emergencyPhone: emergencyPhone.isEmpty ? null : emergencyPhone,
       birthDate: birthDate,

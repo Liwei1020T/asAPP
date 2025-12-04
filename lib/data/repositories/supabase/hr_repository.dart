@@ -119,6 +119,15 @@ class SupabaseHrRepository {
           .eq('id', existing['id'])
           .select()
           .single();
+
+      // Ensure actual_coach_id is set
+      try {
+        await supabaseClient
+            .from('sessions')
+            .update({'actual_coach_id': coachId})
+            .eq('id', sessionId);
+      } catch (_) {}
+
       return CoachShift.fromJson(updated as Map<String, dynamic>);
     }
 
@@ -142,6 +151,17 @@ class SupabaseHrRepository {
         .insert(row)
         .select()
         .single();
+
+    // 更新课程的实际执教教练
+    try {
+      await supabaseClient
+          .from('sessions')
+          .update({'actual_coach_id': coachId})
+          .eq('id', sessionId);
+    } catch (_) {
+      // 忽略更新失败，不阻塞打卡
+    }
+
     return CoachShift.fromJson(inserted as Map<String, dynamic>);
   }
 

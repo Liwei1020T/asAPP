@@ -236,57 +236,9 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
   }
 
   Future<List<Session>> _fetchTodaySessions(String coachId) async {
-    if (coachId.isEmpty) return [];
     try {
       final sessionsRepo = ref.read(supabaseSessionsRepositoryProvider);
-      var sessions = await sessionsRepo.getTodaySessionsForCoach(coachId);
-
-      // 自动根据班级排课生成今天的 Session（若缺失）
-      final classesRepo = ref.read(supabaseClassesRepositoryProvider);
-      final classes = await classesRepo.getClassesForCoach(coachId);
-      final now = DateTime.now();
-      final todayIndex = now.weekday % 7; // 0=周日, 1=周一...
-
-      final todayClasses = classes
-          .where((c) => c.defaultDayOfWeek == todayIndex && c.defaultStartTime != null && c.defaultEndTime != null)
-          .toList();
-
-      if (todayClasses.isEmpty) {
-        return sessions;
-      }
-
-      final existingByClass = <String, bool>{
-        for (final s in sessions) s.classId: true,
-      };
-
-      for (final cg in todayClasses) {
-        if (existingByClass[cg.id] == true) continue;
-
-        final startTime = _combineDateAndTime(now, cg.defaultStartTime!);
-        final endTime = _combineDateAndTime(now, cg.defaultEndTime!);
-
-        final draft = Session(
-          id: 'temp',
-          classId: cg.id,
-          coachId: coachId,
-          title: cg.name,
-          venue: cg.defaultVenue,
-          venueId: null,
-          startTime: startTime,
-          endTime: endTime,
-          status: SessionStatus.scheduled,
-          isPayable: true,
-          actualCoachId: null,
-          completedAt: null,
-          className: cg.name,
-          coachName: null,
-        );
-
-        final created = await sessionsRepo.createSession(draft);
-        sessions.add(created);
-      }
-
-      sessions.sort((a, b) => a.startTime.compareTo(b.startTime));
+      final sessions = await sessionsRepo.getAllTodaySessions();
       return sessions;
     } catch (e) {
       if (mounted) {
@@ -299,61 +251,9 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
   }
 
   Future<List<Session>> _fetchUpcomingSessions(String coachId) async {
-    if (coachId.isEmpty) return [];
     try {
       final sessionsRepo = ref.read(supabaseSessionsRepositoryProvider);
-      var sessions = await sessionsRepo.getUpcomingSessionsForCoach(coachId, limit: 6);
-
-      // 若已有即将课程，直接返回
-      if (sessions.isNotEmpty) {
-        return sessions;
-      }
-
-      // 没有即将课程时，基于班级排课预生成未来两周的课程
-      final classesRepo = ref.read(supabaseClassesRepositoryProvider);
-      final classes = await classesRepo.getClassesForCoach(coachId);
-      if (classes.isEmpty) return sessions;
-
-      final now = DateTime.now();
-      final List<Session> created = [];
-
-      for (int offset = 1; offset <= 14 && created.length < 6; offset++) {
-        final date = now.add(Duration(days: offset));
-        final index = date.weekday % 7;
-
-        for (final cg in classes) {
-          if (cg.defaultDayOfWeek != index ||
-              cg.defaultStartTime == null ||
-              cg.defaultEndTime == null) {
-            continue;
-          }
-
-          final startTime = _combineDateAndTime(date, cg.defaultStartTime!);
-          final endTime = _combineDateAndTime(date, cg.defaultEndTime!);
-
-          final draft = Session(
-            id: 'temp',
-            classId: cg.id,
-            coachId: coachId,
-            title: cg.name,
-            venue: cg.defaultVenue,
-            venueId: null,
-            startTime: startTime,
-            endTime: endTime,
-            status: SessionStatus.scheduled,
-            isPayable: true,
-            actualCoachId: null,
-            completedAt: null,
-            className: cg.name,
-            coachName: null,
-          );
-
-          final createdSession = await sessionsRepo.createSession(draft);
-          created.add(createdSession);
-        }
-      }
-
-      sessions = await sessionsRepo.getUpcomingSessionsForCoach(coachId, limit: 6);
+      final sessions = await sessionsRepo.getAllUpcomingSessions(limit: 6);
       return sessions;
     } catch (e) {
       if (mounted) {
@@ -943,6 +843,13 @@ class _SessionCard extends ConsumerWidget {
                 const SizedBox(height: ASSpacing.xs),
                 Row(
                   children: [
+                    Icon(Icons.calendar_today, size: 14, color: secondaryColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      DateFormatters.date(session.startTime),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(width: ASSpacing.md),
                     Icon(Icons.access_time, size: 14, color: secondaryColor),
                     const SizedBox(width: 4),
                     Text(

@@ -32,6 +32,43 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
     }
   }
 
+  Future<void> _deleteClass(ClassGroup classGroup) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除班级'),
+        content: Text('确定要删除班级「${classGroup.name}」吗？\n此操作将同时删除该班级的所有排课记录。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除', style: TextStyle(color: ASColors.error)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        await ref.read(supabaseClassesRepositoryProvider).deleteClass(classGroup.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('班级已删除')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败：$e')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final stream = ref.read(supabaseClassesRepositoryProvider).watchAllClasses();
@@ -77,6 +114,7 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
                 classGroup: classGroup,
                 animationIndex: index,
                 onTap: () => context.push('/admin/classes/${classGroup.id}'),
+                onDelete: () => _deleteClass(classGroup),
               );
             },
           );
@@ -111,11 +149,13 @@ class _ClassCard extends ConsumerWidget {
   const _ClassCard({
     required this.classGroup,
     required this.onTap,
+    required this.onDelete,
     this.animationIndex = 0,
   });
 
   final ClassGroup classGroup;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
   final int animationIndex;
 
   @override
@@ -147,6 +187,25 @@ class _ClassCard extends ConsumerWidget {
               ASTag(
                 label: classGroup.isActive ? 'Active' : 'Inactive',
                 type: classGroup.isActive ? ASTagType.success : ASTagType.normal,
+              ),
+              const Spacer(),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: secondaryColor, size: 20),
+                onSelected: (value) {
+                  if (value == 'delete') onDelete();
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, color: ASColors.error, size: 20),
+                        SizedBox(width: 8),
+                        Text('删除班级', style: TextStyle(color: ASColors.error)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

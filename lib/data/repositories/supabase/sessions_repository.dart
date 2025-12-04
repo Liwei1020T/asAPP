@@ -38,6 +38,37 @@ class SupabaseSessionsRepository {
     return data.map((e) => _mapSession(e)).toList();
   }
 
+  /// 获取所有今天的课程（不分教练）
+  Future<List<Session>> getAllTodaySessions() async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+
+    final data = await supabaseClient
+        .from('sessions')
+        .select()
+        .gte('start_time', start.toIso8601String())
+        .lt('start_time', end.toIso8601String())
+        .not('status', 'eq', SessionStatus.cancelled.name)
+        .order('start_time', ascending: true);
+
+    return data.map((e) => _mapSession(e)).toList();
+  }
+
+  /// 获取所有即将到来的课程（不分教练）
+  Future<List<Session>> getAllUpcomingSessions({int limit = 5}) async {
+    final now = DateTime.now().toIso8601String();
+    final data = await supabaseClient
+        .from('sessions')
+        .select()
+        .not('status', 'eq', SessionStatus.cancelled.name)
+        .gt('start_time', now)
+        .order('start_time', ascending: true)
+        .limit(limit);
+
+    return data.map((e) => _mapSession(e)).toList();
+  }
+
   /// 获取单个课程
   Future<Session?> getSession(String sessionId) async {
     final data = await supabaseClient
@@ -145,7 +176,7 @@ class SupabaseSessionsRepository {
     return Session(
       id: json['id'] as String,
       classId: json['class_id'] as String,
-      coachId: json['coach_id'] as String,
+      coachId: json['coach_id'] as String?,
       title: json['title'] as String?,
       venue: json['venue'] as String?,
       venueId: json['venue_id'] as String?,

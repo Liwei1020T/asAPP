@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
@@ -231,7 +232,7 @@ class _PlaybookListPageState extends ConsumerState<PlaybookListPage> {
                           final material = materials[index];
                           return _MaterialCard(
                             material: material,
-                            onTap: () => _showMaterialDetail(material),
+                            onTap: () => _openMaterialContent(material),
                             onEdit: () => _editMaterial(material),
                             onDelete: () => _deleteMaterial(material),
                           );
@@ -474,6 +475,70 @@ class _PlaybookListPageState extends ConsumerState<PlaybookListPage> {
         const SnackBar(content: Text('已删除')),
       );
     }
+  }
+
+  void _openMaterialContent(TrainingMaterial material) {
+    if (material.type == TrainingMaterialType.image && material.contentUrl != null) {
+      _showImagePreview(context, material.contentUrl!);
+    } else if (material.contentUrl != null) {
+      _launchUrl(material.contentUrl!);
+    } else if (material.thumbnailUrl != null && material.type == TrainingMaterialType.image) {
+      // Fallback to thumbnail if contentUrl is missing but it's an image
+      _showImagePreview(context, material.thumbnailUrl!);
+    } else {
+      // Fallback to detail dialog if no content to open
+      _showMaterialDetail(material);
+    }
+  }
+
+  Future<void> _launchUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开链接：$urlString')),
+        );
+      }
+    }
+  }
+
+  void _showImagePreview(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black87,
+      builder: (_) {
+        return GestureDetector(
+          onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Stack(
+              children: [
+                Center(
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4,
+                    child: Image.network(
+                      url,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white, size: 64),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                    onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

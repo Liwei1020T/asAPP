@@ -121,6 +121,10 @@ class SupabaseClassesRepository {
         .single();
     return ClassGroup.fromJson(updated as Map<String, dynamic>);
   }
+
+  Future<void> deleteClass(String classId) async {
+    await supabaseClient.from('class_groups').delete().eq('id', classId);
+  }
 }
 
 final supabaseClassesRepositoryProvider = Provider<SupabaseClassesRepository>((ref) {
