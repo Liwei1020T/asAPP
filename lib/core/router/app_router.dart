@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../data/models/student.dart';
 
 import '../../data/models/profile.dart';
 import '../../features/auth/application/auth_providers.dart';
@@ -22,9 +23,9 @@ import '../../features/timeline/presentation/timeline_list_page.dart';
 import '../../features/playbook/presentation/playbook_list_page.dart';
 import '../../features/salary/presentation/salary_page.dart';
 import '../../features/students/presentation/student_list_page.dart';
+import '../../features/students/presentation/student_detail_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../widgets/app_shell.dart';
-import '../constants/animations.dart';
 
 /// 页面转场动画构建器
 CustomTransitionPage<T> _buildPageWithTransition<T>({
@@ -35,40 +36,15 @@ CustomTransitionPage<T> _buildPageWithTransition<T>({
   return CustomTransitionPage<T>(
     key: state.pageKey,
     child: child,
-    transitionDuration: ASAnimations.pageTransition,
-    reverseTransitionDuration: ASAnimations.normal,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      // 淡入 + 向上滑动 + 轻微缩放
-      final fadeAnimation = CurvedAnimation(
-        parent: animation,
-        curve: ASAnimations.pageEnterCurve,
-      );
-      
-      final slideAnimation = Tween<Offset>(
-        begin: const Offset(0, 0.05),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: ASAnimations.pageEnterCurve,
-      ));
-      
-      final scaleAnimation = Tween<double>(
-        begin: 0.98,
-        end: 1.0,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: ASAnimations.pageEnterCurve,
-      ));
-      
       return FadeTransition(
-        opacity: fadeAnimation,
-        child: SlideTransition(
-          position: slideAnimation,
-          child: ScaleTransition(
-            scale: scaleAnimation,
-            child: child,
-          ),
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOut,
         ),
+        child: child,
       );
     },
   );
@@ -83,26 +59,22 @@ CustomTransitionPage<T> _buildModalPageTransition<T>({
   return CustomTransitionPage<T>(
     key: state.pageKey,
     child: child,
-    transitionDuration: ASAnimations.medium,
-    reverseTransitionDuration: ASAnimations.normal,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final fadeAnimation = CurvedAnimation(
-        parent: animation,
-        curve: ASAnimations.smoothCurve,
-      );
-      
-      final slideAnimation = Tween<Offset>(
-        begin: const Offset(0, 0.1),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: ASAnimations.dialogCurve,
-      ));
-      
       return FadeTransition(
-        opacity: fadeAnimation,
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOut,
+        ),
         child: SlideTransition(
-          position: slideAnimation,
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.1),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          )),
           child: child,
         ),
       );
@@ -478,6 +450,21 @@ final routerProvider = Provider<GoRouter>((ref) {
               state: state,
               child: const StudentListPage(),
             ),
+            routes: [
+              GoRoute(
+                path: ':studentId',
+                name: 'student-detail',
+                pageBuilder: (context, state) {
+                  final studentId = state.pathParameters['studentId']!;
+                  final student = state.extra as Student?;
+                  return _buildPageWithTransition(
+                    context: context,
+                    state: state,
+                    child: StudentDetailPage(studentId: studentId, student: student),
+                  );
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/admin/timeline',

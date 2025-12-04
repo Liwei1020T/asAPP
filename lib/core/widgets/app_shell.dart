@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/animations.dart';
-import '../constants/spacing.dart';
 import '../theme/theme_provider.dart';
 
+/// 应用程序外壳
+/// 
+/// 提供响应式导航结构（桌面端侧边栏，移动端底部导航）和全局主题切换。
 class AppShell extends ConsumerWidget {
   const AppShell({
     super.key,
@@ -23,41 +25,54 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final themeState = ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
+    final isDark = themeState.mode == ThemeMode.dark;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 600;
+        final isMobile = constraints.maxWidth < 800; // 调整断点以适应平板
+
+          // 统一的 AppBar Action
+        final actions = [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: onLogout,
+            tooltip: '退出登录',
+          ),
+          const SizedBox(width: 8),
+        ];
+
+        // 统一的 Body 包装器 (添加转场动画)
+        final animatedBody = AnimatedSwitcher(
+          duration: ASAnimations.pageTransitionDuration,
+          switchInCurve: ASAnimations.pageTransitionCurve,
+          switchOutCurve: ASAnimations.pageTransitionCurve,
+          child: KeyedSubtree(
+            key: ValueKey(selectedIndex),
+            child: body,
+          ),
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.05),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            );
+          },
+        );
 
         if (isMobile) {
           return Scaffold(
             appBar: AppBar(
-              actions: [
-                // 主题切换按钮
-                IconButton(
-                  icon: AnimatedSwitcher(
-                    duration: ASAnimations.fast,
-                    child: Icon(
-                      getThemeModeIcon(themeState.mode),
-                      key: ValueKey(themeState.mode),
-                    ),
-                  ),
-                  onPressed: () => themeNotifier.toggleTheme(),
-                  tooltip: getThemeModeName(themeState.mode),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  onPressed: onLogout,
-                ),
-              ],
+              title: const Text('ASP-MS'),
+              actions: actions,
             ),
-            body: AnimatedSwitcher(
-              duration: ASAnimations.normal,
-              child: body,
-            ),
+            body: animatedBody,
             bottomNavigationBar: NavigationBar(
               selectedIndex: selectedIndex,
               onDestinationSelected: onDestinationSelected,
@@ -72,66 +87,26 @@ class AppShell extends ConsumerWidget {
           );
         }
 
-        final isExtended = constraints.maxWidth >= 900;
-        final surfaceColor = theme.colorScheme.surface;
-        final primaryColor = theme.colorScheme.primary;
-        final textSecondaryColor = isDark 
-            ? Colors.white70 
-            : Colors.black54;
-
         return Scaffold(
           body: Row(
             children: [
               NavigationRail(
-                extended: isExtended,
-                backgroundColor: surfaceColor,
-                selectedIconTheme: IconThemeData(color: primaryColor),
-                unselectedIconTheme: IconThemeData(color: textSecondaryColor),
-                selectedLabelTextStyle: TextStyle(
-                  color: primaryColor,
-                  fontWeight: FontWeight.bold,
+                selectedIndex: selectedIndex,
+                onDestinationSelected: onDestinationSelected,
+                labelType: NavigationRailLabelType.all,
+                leading: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: FlutterLogo(size: 32), // 替换为应用 Logo
                 ),
-                unselectedLabelTextStyle: TextStyle(
-                  color: textSecondaryColor,
-                ),
-                leading: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: ASSpacing.lg),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                trailing: Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: primaryColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.sports_tennis, color: Colors.white),
-                      )
-                          .animate()
-                          .scale(
-                            begin: const Offset(0.8, 0.8),
-                            end: const Offset(1, 1),
-                            duration: ASAnimations.medium,
-                            curve: ASAnimations.emphasizeCurve,
-                          ),
-                      if (isExtended) ...[
-                        const SizedBox(width: ASSpacing.sm),
-                        Text(
-                          'ASP-MS',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: theme.textTheme.titleLarge?.color,
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(duration: ASAnimations.normal)
-                            .slideX(
-                              begin: -0.2,
-                              end: 0,
-                              duration: ASAnimations.normal,
-                            ),
-                      ],
+                      IconButton(
+                        icon: const Icon(Icons.logout),
+                        onPressed: onLogout,
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -142,65 +117,9 @@ class AppShell extends ConsumerWidget {
                           label: Text(d.label),
                         ))
                     .toList(),
-                selectedIndex: selectedIndex,
-                onDestinationSelected: onDestinationSelected,
-                trailing: Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: ASSpacing.lg),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // 主题切换按钮
-                          IconButton(
-                            icon: AnimatedSwitcher(
-                              duration: ASAnimations.fast,
-                              transitionBuilder: (child, animation) {
-                                return RotationTransition(
-                                  turns: animation,
-                                  child: FadeTransition(
-                                    opacity: animation,
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              child: Icon(
-                                getThemeModeIcon(themeState.mode),
-                                key: ValueKey(themeState.mode),
-                                color: textSecondaryColor,
-                              ),
-                            ),
-                            onPressed: () => themeNotifier.toggleTheme(),
-                            tooltip: getThemeModeName(themeState.mode),
-                          ),
-                          const SizedBox(height: ASSpacing.sm),
-                          IconButton(
-                            icon: Icon(Icons.logout, color: textSecondaryColor),
-                            onPressed: onLogout,
-                            tooltip: '退出登录',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
               ),
-              VerticalDivider(
-                thickness: 1,
-                width: 1,
-                color: theme.dividerColor,
-              ),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: ASAnimations.normal,
-                  child: Container(
-                    key: ValueKey(selectedIndex),
-                    color: theme.scaffoldBackgroundColor,
-                    child: body,
-                  ),
-                ),
-              ),
+              const VerticalDivider(thickness: 1, width: 1),
+              Expanded(child: animatedBody),
             ],
           ),
         );

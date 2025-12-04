@@ -1,8 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -104,6 +105,8 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(_classGroup?.name ?? '班级详情'),
@@ -128,7 +131,9 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
         ],
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
+          indicatorColor: theme.colorScheme.primary,
+          labelColor: theme.colorScheme.primary,
+          unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
           tabs: const [
             Tab(text: '学员 Students'),
             Tab(text: '课程 Sessions'),
@@ -169,13 +174,15 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
           return _tabController.index == 1
               ? FloatingActionButton.extended(
                   onPressed: _showCreateSessionDialog,
-                  backgroundColor: ASColors.primary,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                   icon: const Icon(Icons.add),
                   label: const Text('排课'),
                 )
               : FloatingActionButton.extended(
                   onPressed: _showAddStudentDialog,
-                  backgroundColor: ASColors.primary,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                   icon: const Icon(Icons.person_add),
                   label: const Text('添加学员'),
                 );
@@ -186,10 +193,11 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
 
   Widget _buildClassInfoCard() {
     if (_classGroup == null) return const SizedBox();
+    final theme = Theme.of(context);
 
     return Container(
       padding: const EdgeInsets.all(ASSpacing.pagePadding),
-      color: ASColors.surface,
+      color: theme.colorScheme.surface,
       child: ASCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,17 +355,14 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
       );
     }
 
-    return ListView.separated(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(ASSpacing.pagePadding),
-      itemCount: _students.length,
-      separatorBuilder: (_, __) => const SizedBox(height: ASSpacing.md),
-      itemBuilder: (context, index) {
-        final student = _students[index];
-        return _StudentCard(
+      child: ASStaggeredColumn(
+        children: _students.map((student) => _StudentCard(
           student: student,
           onRemove: () => _removeStudent(student),
-        );
-      },
+        )).toList(),
+      ),
     );
   }
 
@@ -385,23 +390,23 @@ class _AdminClassDetailPageState extends ConsumerState<AdminClassDetailPage>
           );
         }
 
-        return ListView.separated(
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(ASSpacing.pagePadding),
-          itemCount: sessions.length,
-          separatorBuilder: (_, __) => const SizedBox(height: ASSpacing.md),
-          itemBuilder: (context, index) {
-            final session = sessions[index];
-            final currentUser = ref.read(currentUserProvider);
-            final canManage = currentUser?.role == UserRole.admin ||
-                (currentUser?.role == UserRole.coach && session.coachId == currentUser?.id);
+          child: ASStaggeredColumn(
+            children: sessions.map((session) {
+              final currentUser = ref.read(currentUserProvider);
+              final canManage = currentUser?.role == UserRole.admin ||
+                  (currentUser?.role == UserRole.coach && session.coachId == currentUser?.id);
 
-            return _SessionCard(
-              session: session,
-              onEdit: () => _showEditSessionDialog(session),
-              onDelete: () => _deleteSession(session),
-              canManage: canManage,
-            );
-          },
+              return _SessionCard(
+                session: session,
+                onEdit: () => _showEditSessionDialog(session),
+                onDelete: () => _deleteSession(session),
+                onTap: () => context.push('/attendance/${session.id}'),
+                canManage: canManage,
+              );
+            }).toList(),
+          ),
         );
       },
     );
@@ -488,21 +493,23 @@ class _InfoItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 16, color: ASColors.textSecondary),
+        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
         const SizedBox(width: ASSpacing.xs),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: Theme.of(context).textTheme.labelSmall,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 14,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -522,20 +529,16 @@ class _StudentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return ASCard(
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: ASColors.info.withValues(alpha: 0.1),
-            child: Text(
-              student.fullName.substring(0, 1),
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: ASColors.info,
-              ),
-            ),
+          ASAvatar(
+            name: student.fullName,
+            size: ASAvatarSize.md,
+            showBorder: true,
+            backgroundColor: theme.colorScheme.primaryContainer,
+            foregroundColor: theme.colorScheme.onPrimaryContainer,
           ),
           const SizedBox(width: ASSpacing.md),
           Expanded(
@@ -544,15 +547,14 @@ class _StudentCard extends StatelessWidget {
               children: [
                 Text(
                   student.fullName,
-                  style: const TextStyle(
-                    fontSize: 16,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: ASSpacing.xs),
                 Text(
                   '剩余课时 ${student.remainingSessions} / ${student.totalSessions}',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: theme.textTheme.bodySmall,
                 ),
               ],
             ),
@@ -574,24 +576,35 @@ class _SessionCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.canManage,
+    this.onTap,
   });
 
   final Session session;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final bool canManage;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusColor = _getStatusColor(theme);
+
     return ASCard(
-      child: Row(
-        children: [
+      padding: EdgeInsets.zero, // Remove default padding for InkWell
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12), // Match card radius
+        child: Padding(
+          padding: const EdgeInsets.all(ASSpacing.md), // Re-add padding
+          child: Row(
+            children: [
           // 日期指示
           Container(
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: _getStatusColor().withValues(alpha: 0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -602,14 +615,14 @@ class _SessionCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: _getStatusColor(),
+                    color: statusColor,
                   ),
                 ),
                 Text(
                   DateFormatters.weekday(session.startTime.weekday),
                   style: TextStyle(
                     fontSize: 11,
-                    color: _getStatusColor(),
+                    color: statusColor,
                   ),
                 ),
               ],
@@ -623,26 +636,21 @@ class _SessionCard extends StatelessWidget {
               children: [
                 Text(
                   session.title ?? '常规训练',
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: ASSpacing.xs),
                 Text(
                   DateFormatters.timeRange(session.startTime, session.endTime),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: theme.textTheme.bodySmall,
                 ),
                 if (session.venue != null && session.venue!.isNotEmpty)
                   Text(
                     session.venue!,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: theme.textTheme.bodySmall,
                   ),
-                if (session.coachName != null && session.coachName!.isNotEmpty)
-                  Text(
-                    '教练：${session.coachName}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                // Coach name display removed
               ],
             ),
           ),
@@ -671,19 +679,21 @@ class _SessionCard extends StatelessWidget {
                 ),
             ],
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Color _getStatusColor() {
+  Color _getStatusColor(ThemeData theme) {
     switch (session.status) {
       case SessionStatus.completed:
         return ASColors.success;
       case SessionStatus.cancelled:
         return ASColors.error;
       case SessionStatus.scheduled:
-        return ASColors.primary;
+        return theme.colorScheme.primary;
     }
   }
 
@@ -789,6 +799,7 @@ class _CreateSessionDialogState extends ConsumerState<_CreateSessionDialog> {
     }
     _isPayable = widget.initialSession?.isPayable ?? true;
     _loadCoaches();
+    _loadVenues();
   }
 
   @override
@@ -800,24 +811,7 @@ class _CreateSessionDialogState extends ConsumerState<_CreateSessionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final coachDropdown = DropdownButtonFormField<String?>(
-      value: _coachId,
-      decoration: const InputDecoration(
-        labelText: '教练',
-        border: OutlineInputBorder(),
-      ),
-      items: [
-        const DropdownMenuItem(
-          value: null,
-          child: Text('不指定教练 (所有教练可见)'),
-        ),
-        ..._coaches.map((c) => DropdownMenuItem(
-              value: c.id,
-              child: Text(c.fullName),
-            )),
-      ],
-      onChanged: (v) => setState(() => _coachId = v),
-    );
+    // Coach dropdown removed as per request to decouple session from coach
 
     return Form(
       key: _formKey,
@@ -850,7 +844,7 @@ class _CreateSessionDialogState extends ConsumerState<_CreateSessionDialog> {
               validator: (v) => v == null || v.trim().isEmpty ? '请输入标题' : null,
             ),
             const SizedBox(height: 12),
-            coachDropdown,
+            // coachDropdown removed
             const SizedBox(height: 12),
             DropdownButtonFormField<Venue>(
               value: _selectedVenue,
@@ -1031,7 +1025,7 @@ class _CreateSessionDialogState extends ConsumerState<_CreateSessionDialog> {
     final session = Session(
       id: widget.initialSession?.id ?? '', // Supabase 会生成 UUID
       classId: widget.classGroup.id,
-      coachId: _coachId ?? widget.classGroup.defaultCoachId,
+      coachId: null, // Decoupled from coach
       title: _titleController.text.trim(),
       venue: _selectedVenue?.name ?? _venueController.text.trim(),
       venueId: _selectedVenue?.id,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
@@ -52,7 +53,7 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('薪资统计 Salary'),
+        title: const Text('薪资统计'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -62,13 +63,13 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
         stream: stream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return Padding(
-              padding: const EdgeInsets.all(ASSpacing.pagePadding),
+            return const Padding(
+              padding: EdgeInsets.all(ASSpacing.pagePadding),
               child: Column(
                 children: [
-                  const ASSkeletonStatCard(),
-                  const SizedBox(height: ASSpacing.lg),
-                  const ASSkeletonList(itemCount: 4, hasAvatar: false),
+                  ASSkeletonStatCard(),
+                  SizedBox(height: ASSpacing.lg),
+                  ASSkeletonList(itemCount: 4, hasAvatar: false),
                 ],
               ),
             );
@@ -81,31 +82,30 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
 
           return SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            padding: const EdgeInsets.all(ASSpacing.pagePadding),
+            child: ASStaggeredColumn(
               children: [
                 _buildMonthSelector(),
-                Padding(
-                  padding: const EdgeInsets.all(ASSpacing.pagePadding),
-                  child: _buildSalarySummary(currentUser, totalSalary, totalSessions),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (todayShifts.isNotEmpty) ...[
-                        const ASSectionTitle(title: '今日打卡'),
-                        const SizedBox(height: ASSpacing.sm),
-                        _buildTodayShifts(todayShifts),
-                        const SizedBox(height: ASSpacing.xl),
-                      ],
-                      const ASSectionTitle(title: '课时明细'),
-                      const SizedBox(height: ASSpacing.md),
-                      shifts.isEmpty ? _buildEmptyState() : _buildShiftsList(shifts),
-                    ],
+                const SizedBox(height: ASSpacing.lg),
+                _buildSalarySummary(currentUser, totalSalary, totalSessions),
+                const SizedBox(height: ASSpacing.xl),
+                if (todayShifts.isNotEmpty) ...[
+                  ASSectionTitle(
+                    title: '今日打卡',
+                    subtitle: 'Today\'s Shifts',
+                    animate: true,
                   ),
+                  const SizedBox(height: ASSpacing.sm),
+                  _buildTodayShifts(todayShifts),
+                  const SizedBox(height: ASSpacing.xl),
+                ],
+                ASSectionTitle(
+                  title: '课时明细',
+                  subtitle: 'Session Details',
+                  animate: true,
                 ),
+                const SizedBox(height: ASSpacing.md),
+                shifts.isEmpty ? _buildEmptyState() : _buildShiftsList(shifts),
                 const SizedBox(height: ASSpacing.xl),
               ],
             ),
@@ -116,32 +116,47 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
   }
 
   Widget _buildMonthSelector() {
-    return ASCard.glass(
+    final theme = Theme.of(context);
+    return ASCard(
       padding: const EdgeInsets.symmetric(
         horizontal: ASSpacing.lg,
         vertical: ASSpacing.md,
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
             icon: const Icon(Icons.chevron_left),
             onPressed: () => _changeMonth(-1),
-          ),
-          const SizedBox(width: ASSpacing.md),
-          Text(
-            DateFormatters.month(_selectedMonth),
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
             ),
           ),
-          const SizedBox(width: ASSpacing.md),
+          Column(
+            children: [
+              Text(
+                DateFormatters.month(_selectedMonth),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              Text(
+                '${_selectedMonth.year}年',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.chevron_right),
             onPressed: _selectedMonth.isBefore(DateTime.now())
                 ? () => _changeMonth(1)
                 : null,
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            ),
           ),
         ],
       ),
@@ -155,13 +170,11 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ASStatCard(
-          title: '${DateFormatters.month(_selectedMonth)} 预计收入',
+          title: '本月预计收入',
           valueText: 'RM ${totalSalary.toStringAsFixed(2)}',
-          subtitle: '含已完成课时',
+          subtitle: '基于已完成课时计算',
           icon: Icons.account_balance_wallet,
           color: ASColors.success,
-          animateValue: false,
-          animationIndex: 0,
         ),
         const SizedBox(height: ASSpacing.md),
         Row(
@@ -173,7 +186,6 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
                 subtitle: '本月完成',
                 icon: Icons.event_available,
                 color: ASColors.primary,
-                animationIndex: 1,
               ),
             ),
             const SizedBox(width: ASSpacing.md),
@@ -181,11 +193,9 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
               child: ASStatCard(
                 title: '课时单价',
                 valueText: 'RM ${rate.toStringAsFixed(0)}',
-                subtitle: '来自个人资料',
+                subtitle: '基础费率',
                 icon: Icons.payments,
                 color: ASColors.info,
-                animateValue: false,
-                animationIndex: 2,
               ),
             ),
           ],
@@ -203,30 +213,50 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
   }
 
   Widget _buildTodayShifts(List<CoachShift> shifts) {
+    final theme = Theme.of(context);
     return ASCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: shifts.map((s) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: ASSpacing.sm),
+          final isCompleted = s.status == ShiftStatus.completed;
+          return Container(
+            margin: const EdgeInsets.only(bottom: ASSpacing.sm),
+            padding: const EdgeInsets.all(ASSpacing.sm),
+            decoration: BoxDecoration(
+              color: isCompleted ? ASColors.success.withValues(alpha: 0.05) : theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isCompleted ? ASColors.success.withValues(alpha: 0.2) : theme.colorScheme.outlineVariant,
+              ),
+            ),
             child: Row(
               children: [
                 Icon(
-                  s.status == ShiftStatus.completed ? Icons.check_circle : Icons.schedule,
-                  color: s.status == ShiftStatus.completed ? ASColors.success : ASColors.info,
-                  size: 18,
+                  isCompleted ? Icons.check_circle : Icons.schedule,
+                  color: isCompleted ? ASColors.success : ASColors.info,
+                  size: 20,
                 ),
-                const SizedBox(width: ASSpacing.sm),
+                const SizedBox(width: ASSpacing.md),
                 Expanded(
-                  child: Text(
-                    '${s.className ?? '课程'} · ${s.startTime}-${s.endTime.isNotEmpty ? s.endTime : '--'}',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.className ?? '课程',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        '${s.startTime} - ${s.endTime.isNotEmpty ? s.endTime : '--'}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  s.clockInAt != null ? DateFormatters.time(s.clockInAt!) : '',
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
+                if (s.clockInAt != null)
+                  ASTag(
+                    label: '打卡: ${DateFormatters.time(s.clockInAt!)}',
+                    type: ASTagType.success,
+                  ),
               ],
             ),
           );
@@ -266,13 +296,19 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
             // 日期标题
             Padding(
               padding: const EdgeInsets.symmetric(vertical: ASSpacing.sm),
-              child: Text(
-                DateFormatters.friendlyDate(dateObj),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: ASColors.textSecondary,
-                ),
+              child: Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: ASColors.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    DateFormatters.friendlyDate(dateObj),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: ASColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
             // 当日课时
@@ -285,59 +321,6 @@ class _SalaryPageState extends ConsumerState<SalaryPage> {
   }
 }
 
-/// 统计列
-class _StatColumn extends StatelessWidget {
-  const _StatColumn({
-    required this.label,
-    required this.value,
-    required this.unit,
-  });
-
-  final String label;
-  final String value;
-  final String unit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (unit.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 2),
-                child: Text(
-                  unit,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: ASColors.textSecondary,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: ASSpacing.xs),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: ASColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// 课时卡片
 class _ShiftCard extends StatelessWidget {
   const _ShiftCard({required this.shift});
@@ -346,28 +329,23 @@ class _ShiftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: ASSpacing.sm),
+    final theme = Theme.of(context);
+    return ASCard(
       padding: const EdgeInsets.all(ASSpacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
-        border: Border.all(color: ASColors.divider),
-      ),
       child: Row(
         children: [
           // 状态图标
           Container(
-            width: 40,
-            height: 40,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: _getStatusColor().withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               _getStatusIcon(),
               color: _getStatusColor(),
-              size: 20,
+              size: 24,
             ),
           ),
           const SizedBox(width: ASSpacing.md),
@@ -379,15 +357,22 @@ class _ShiftCard extends StatelessWidget {
               children: [
                 Text(
                   shift.className ?? '未知班级',
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${shift.startTime} - ${shift.endTime}',
-                  style: Theme.of(context).textTheme.bodySmall,
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.access_time, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${shift.startTime} - ${shift.endTime}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

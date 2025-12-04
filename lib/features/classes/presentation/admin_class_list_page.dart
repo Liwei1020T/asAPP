@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -72,7 +74,8 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
   @override
   Widget build(BuildContext context) {
     final stream = ref.read(supabaseClassesRepositoryProvider).watchAllClasses();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -84,9 +87,11 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: ASSpacing.md),
-            child: ASSmallButton(
-              label: '+ 新增班级',
+            child: ASPrimaryButton(
+              label: '新增班级',
+              icon: Icons.add,
               onPressed: _showCreateClassDialog,
+              height: 32,
             ),
           ),
         ],
@@ -95,8 +100,8 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
         stream: stream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return Padding(
-              padding: const EdgeInsets.all(ASSpacing.pagePadding),
+            return const Padding(
+              padding: EdgeInsets.all(ASSpacing.pagePadding),
               child: ASSkeletonList(itemCount: 5, hasAvatar: false),
             );
           }
@@ -104,19 +109,15 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
           final classes = snapshot.data ?? [];
           if (classes.isEmpty) return _buildEmptyState(isDark);
 
-          return ListView.separated(
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(ASSpacing.pagePadding),
-            itemCount: classes.length,
-            separatorBuilder: (_, __) => const SizedBox(height: ASSpacing.md),
-            itemBuilder: (context, index) {
-              final classGroup = classes[index];
-              return _ClassCard(
+            child: ASStaggeredColumn(
+              children: classes.map((classGroup) => _ClassCard(
                 classGroup: classGroup,
-                animationIndex: index,
                 onTap: () => context.push('/admin/classes/${classGroup.id}'),
                 onDelete: () => _deleteClass(classGroup),
-              );
-            },
+              )).toList(),
+            ),
           );
         },
       ),
@@ -124,9 +125,6 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
   }
 
   Widget _buildEmptyState(bool isDark) {
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
-    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -134,9 +132,13 @@ class _AdminClassListPageState extends ConsumerState<AdminClassListPage> {
           const ASEmptyState(
             type: ASEmptyStateType.noData,
             title: '暂无班级',
-            description: '点击下方按钮创建第一个班级',
+            description: '点击右上角按钮创建第一个班级',
             icon: Icons.class_outlined,
-            actionLabel: '创建第一个班级',
+          ),
+          const SizedBox(height: ASSpacing.lg),
+          ASPrimaryButton(
+            label: '创建第一个班级',
+            onPressed: _showCreateClassDialog,
           ),
         ],
       ),
@@ -150,23 +152,19 @@ class _ClassCard extends ConsumerWidget {
     required this.classGroup,
     required this.onTap,
     required this.onDelete,
-    this.animationIndex = 0,
   });
 
   final ClassGroup classGroup;
   final VoidCallback onTap;
   final VoidCallback onDelete;
-  final int animationIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final secondaryColor = theme.colorScheme.onSurfaceVariant;
     
     return ASCard(
-      animate: true,
-      animationIndex: animationIndex,
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,19 +174,20 @@ class _ClassCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   classGroup.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              if (classGroup.level != null) ASLevelTag(level: classGroup.level!),
-              const SizedBox(width: ASSpacing.sm),
+              if (classGroup.level != null) ...[
+                ASLevelTag(level: classGroup.level!),
+                const SizedBox(width: ASSpacing.sm),
+              ],
               ASTag(
                 label: classGroup.isActive ? 'Active' : 'Inactive',
                 type: classGroup.isActive ? ASTagType.success : ASTagType.normal,
               ),
-              const Spacer(),
+              const SizedBox(width: ASSpacing.sm),
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: secondaryColor, size: 20),
                 onSelected: (value) {
@@ -212,15 +211,18 @@ class _ClassCard extends ConsumerWidget {
           const SizedBox(height: ASSpacing.md),
           Row(
             children: [
-              _InfoChip(
-                icon: Icons.schedule,
-                label: _getScheduleText(),
+              Expanded(
+                child: _InfoChip(
+                  icon: Icons.schedule,
+                  label: _getScheduleText(),
+                ),
               ),
-              const SizedBox(width: ASSpacing.lg),
               if (classGroup.defaultVenue != null)
-                _InfoChip(
-                  icon: Icons.location_on,
-                  label: classGroup.defaultVenue!,
+                Expanded(
+                  child: _InfoChip(
+                    icon: Icons.location_on,
+                    label: classGroup.defaultVenue!,
+                  ),
                 ),
             ],
           ),
@@ -233,18 +235,31 @@ class _ClassCard extends ConsumerWidget {
                 future: _getStudentCount(ref, classGroup.id),
                 builder: (context, snapshot) {
                   final count = snapshot.data ?? 0;
-                  return Text(
-                    '$count / ${classGroup.capacity ?? '∞'} 学生',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: secondaryColor,
-                      fontWeight: FontWeight.w500,
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.people, size: 14, color: secondaryColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$count / ${classGroup.capacity ?? '∞'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: secondaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },
               ),
               const SizedBox(width: ASSpacing.sm),
-              Icon(Icons.chevron_right, color: hintColor),
+              Icon(Icons.chevron_right, color: theme.hintColor),
             ],
           ),
         ],
@@ -277,17 +292,21 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
+    final theme = Theme.of(context);
     
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: secondaryColor),
+        Icon(icon, size: 14, color: theme.colorScheme.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
+        Flexible(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

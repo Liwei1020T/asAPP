@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
+import '../../../core/constants/animations.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../data/models/profile.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
 import '../application/auth_providers.dart';
 
-/// 登录页面
+/// 登录页面 - 现代化重构版
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -62,7 +62,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      // 根据角色映射到预设测试账号（需在 Supabase 中手动创建）
       const roleAccounts = {
         UserRole.coach: {'email': 'tan.li.wei8008@gmail.com', 'password': 'password'},
         UserRole.parent: {'email': 'liwei1020@1utar.my', 'password': 'Liwei1020@'},
@@ -70,9 +69,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         UserRole.student: {'email': 'student@example.com', 'password': '123456'},
       };
       final account = roleAccounts[role];
-      if (account == null) {
-        throw Exception('未配置该角色的快速登录账号');
-      }
+      if (account == null) throw Exception('未配置该角色的快速登录账号');
 
       final authRepo = ref.read(supabaseAuthRepositoryProvider);
       final user = await authRepo.signInWithEmail(account['email']!, account['password']!);
@@ -103,8 +100,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         context.go('/coach-dashboard');
         break;
       case UserRole.parent:
-        context.go('/parent-dashboard');
-        break;
       case UserRole.student:
         context.go('/parent-dashboard');
         break;
@@ -114,191 +109,195 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
+
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(ASSpacing.xl),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo 和标题 - 带入场动画
-                  _buildHeader(theme),
-                  const SizedBox(height: ASSpacing.xxl),
-
-                  // 登录表单 - 带入场动画
-                  _buildLoginForm(theme),
-                  const SizedBox(height: ASSpacing.xl),
-
-        // 快速登录按钮（开发用）
-        _buildQuickLoginSection(theme),
-                ],
+      body: Stack(
+        children: [
+          // 动态背景
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFFF5F7FA), const Color(0xFFE4E9F2)],
+                ),
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
+          
+          // 装饰性背景圆
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              ),
+            ).animate().scale(duration: 2.seconds, curve: Curves.easeInOut).fadeIn(),
+          ),
 
-  Widget _buildHeader(ThemeData theme) {
-    final primaryColor = theme.colorScheme.primary;
-    
-    return ASGlassContainer.adaptive(
-      padding: const EdgeInsets.all(ASSpacing.xl),
-      blur: ASColors.glassBlurSigma,
-      opacity: 0.9,
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: primaryColor,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.3),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(ASSpacing.lg),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ASStaggeredColumn(
+                  animate: true,
+                  children: [
+                    // Logo 区域
+                    Center(
+                      child: Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.sports_tennis,
+                          size: 48,
+                          color: Colors.white,
+                        ),
+                      ).animate().scale(duration: ASAnimations.medium, curve: ASAnimations.emphasized),
+                    ),
+                    const SizedBox(height: ASSpacing.xl),
+                    
+                    // 标题
+                    Center(
+                      child: Text(
+                        'Art Sport Penang',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: ASSpacing.xs),
+                    Center(
+                      child: Text(
+                        'Management System',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.textTheme.bodySmall?.color,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: ASSpacing.xxl),
+
+                    // 登录卡片
+                    ASCard.glass(
+                      padding: const EdgeInsets.all(ASSpacing.xl),
+                      glassOpacity: 0.8,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ASTextField(
+                            controller: _emailController,
+                            label: '邮箱',
+                            hint: '请输入邮箱地址',
+                            prefixIcon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: ASSpacing.lg),
+                          ASTextField(
+                            controller: _passwordController,
+                            label: '密码',
+                            hint: '请输入密码',
+                            prefixIcon: Icons.lock_outlined,
+                            obscureText: true,
+                          ),
+                          const SizedBox(height: ASSpacing.xl),
+                          ASPrimaryButton(
+                            label: '登录',
+                            onPressed: _signIn,
+                            isLoading: _isLoading,
+                            isFullWidth: true,
+                            height: 52,
+                            animate: true,
+                          ),
+                          const SizedBox(height: ASSpacing.lg),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '没有账号？',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              TextButton(
+                                onPressed: () => context.go('/register'),
+                                child: const Text('立即注册'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: ASSpacing.xl),
+
+                    // 快速登录区域
+                    const Divider(),
+                    const SizedBox(height: ASSpacing.md),
+                    Center(
+                      child: Text(
+                        '快速登录（开发模式）',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.hintColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: ASSpacing.md),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _QuickLoginIcon(
+                          label: '教练',
+                          icon: Icons.sports,
+                          color: theme.colorScheme.primary,
+                          onTap: () => _quickSignInAs(UserRole.coach),
+                          isLoading: _isLoading,
+                        ),
+                        _QuickLoginIcon(
+                          label: '家长',
+                          icon: Icons.family_restroom,
+                          color: theme.colorScheme.tertiary,
+                          onTap: () => _quickSignInAs(UserRole.parent),
+                          isLoading: _isLoading,
+                        ),
+                        _QuickLoginIcon(
+                          label: '管理员',
+                          icon: Icons.admin_panel_settings,
+                          color: Colors.green,
+                          onTap: () => _quickSignInAs(UserRole.admin),
+                          isLoading: _isLoading,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-            child: const Icon(
-              Icons.sports_tennis,
-              size: 48,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: ASSpacing.lg),
-          Text(
-            'Art Sport Penang',
-            style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor,
-                ),
-          ),
-          const SizedBox(height: ASSpacing.xs),
-          Text(
-            'Management System',
-            style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.textTheme.bodySmall?.color,
-                ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildLoginForm(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ASTextField(
-          controller: _emailController,
-          label: '邮箱',
-          hint: '请输入邮箱地址',
-          prefixIcon: Icons.email_outlined,
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: ASSpacing.lg),
-        ASTextField(
-          controller: _passwordController,
-          label: '密码',
-          hint: '请输入密码',
-          prefixIcon: Icons.lock_outlined,
-          obscureText: true,
-        ),
-        const SizedBox(height: ASSpacing.xl),
-        ASPrimaryButton(
-          label: '登录',
-          onPressed: _signIn,
-          isLoading: _isLoading,
-          isFullWidth: true,
-          height: 52,
-          animate: true,
-          animationDelay: 500.ms,
-        ),
-        const SizedBox(height: ASSpacing.lg),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '没有账号？',
-              style: theme.textTheme.bodyMedium,
-            ),
-            TextButton(
-              onPressed: () => context.go('/register'),
-              child: const Text('立即注册'),
-            ),
-          ],
-        )
-            .animate(delay: 550.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.2, end: 0),
-      ],
-    );
-  }
-
-  Widget _buildQuickLoginSection(ThemeData theme) {
-    final primaryColor = theme.colorScheme.primary;
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Divider(height: 32),
-        Text(
-          '快速登录（开发模式）',
-          style: theme.textTheme.labelMedium,
-        ),
-        const SizedBox(height: ASSpacing.md),
-        Row(
-          children: [
-            Expanded(
-              child: _QuickLoginButton(
-                label: '教练',
-                icon: Icons.sports,
-                color: primaryColor,
-                onTap: () => _quickSignInAs(UserRole.coach),
-                isLoading: _isLoading,
-              ),
-            ),
-            const SizedBox(width: ASSpacing.sm),
-            Expanded(
-              child: _QuickLoginButton(
-                label: '家长',
-                icon: Icons.family_restroom,
-                color: theme.colorScheme.tertiary,
-                onTap: () => _quickSignInAs(UserRole.parent),
-                isLoading: _isLoading,
-              ),
-            ),
-            const SizedBox(width: ASSpacing.sm),
-            Expanded(
-              child: _QuickLoginButton(
-                label: '管理员',
-                icon: Icons.admin_panel_settings,
-                color: Colors.green,
-                onTap: () => _quickSignInAs(UserRole.admin),
-                isLoading: _isLoading,
-              ),
-            ),
-          ],
-        )
-            .animate(delay: 600.ms)
-            .fadeIn(duration: ASAnimations.normal)
-            .slideY(begin: 0.2, end: 0),
-      ],
-    );
-  }
 }
 
-class _QuickLoginButton extends StatefulWidget {
-  const _QuickLoginButton({
+class _QuickLoginIcon extends StatelessWidget {
+  const _QuickLoginIcon({
     required this.label,
     required this.icon,
     required this.color,
@@ -313,47 +312,35 @@ class _QuickLoginButton extends StatefulWidget {
   final bool isLoading;
 
   @override
-  State<_QuickLoginButton> createState() => _QuickLoginButtonState();
-}
-
-class _QuickLoginButtonState extends State<_QuickLoginButton> {
-  bool _isPressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.isLoading ? null : widget.onTap,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.95 : 1.0,
-        duration: ASAnimations.fast,
-        child: Material(
-          color: widget.color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: ASSpacing.md,
-              horizontal: ASSpacing.sm,
+    return InkWell(
+      onTap: isLoading ? null : onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
             ),
-            child: Column(
-              children: [
-                Icon(widget.icon, color: widget.color, size: 28),
-                const SizedBox(height: ASSpacing.xs),
-                Text(
-                  widget.label,
-                  style: TextStyle(
-                    color: widget.color,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
+

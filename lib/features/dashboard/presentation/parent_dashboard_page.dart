@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
@@ -16,7 +16,7 @@ import '../../../data/repositories/supabase/attendance_repository.dart';
 import '../../../data/repositories/supabase/timeline_repository.dart';
 import '../../notices/presentation/notice_detail_sheet.dart';
 
-/// 家长仪表板
+/// 家长仪表板 - 现代化重构版
 class ParentDashboardPage extends ConsumerStatefulWidget {
   const ParentDashboardPage({super.key});
 
@@ -130,10 +130,10 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
           padding: const EdgeInsets.all(8.0),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.sports_tennis, size: 24),
+            child: Icon(Icons.sports_tennis, size: 24, color: theme.colorScheme.primary),
           ),
         ),
         actions: [
@@ -145,46 +145,35 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
               size: ASAvatarSize.sm,
               showBorder: true,
               onTap: _showProfileMenu,
-              animate: true,
             ),
-          ).animate().scale(
-                delay: ASAnimations.fast,
-                duration: ASAnimations.medium,
-                curve: ASAnimations.bounceCurve,
-              ),
+          ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadChildren,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: ASStaggeredColumn(
+            animate: true,
             children: [
               // 问候语
               _buildGreetingSection(isDark),
 
               // 孩子出勤概览
-              ASSectionTitle(
+              const ASSectionTitle(
                 title: '📊 出勤概览 Attendance Overview',
-                animate: true,
-                animationDelay: 100.ms,
               ),
               _buildChildrenAttendanceSection(isDark),
 
               // 训练精彩时刻
-              ASSectionTitle(
+              const ASSectionTitle(
                 title: '🎬 训练精彩 Training Moments',
-                animate: true,
-                animationDelay: 200.ms,
               ),
               _buildMomentsSection(isDark),
 
               // 公告
-              ASSectionTitle(
+              const ASSectionTitle(
                 title: '📢 通知 Notices',
-                animate: true,
-                animationDelay: 300.ms,
               ),
               _buildNoticesSection(isDark),
 
@@ -197,6 +186,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
   }
 
   void _showProfileMenu() {
+    final theme = Theme.of(context);
     ASBottomSheet.show(
       context: context,
       title: '个人中心',
@@ -212,8 +202,8 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.logout, color: ASColors.error),
-            title: const Text('退出登录', style: TextStyle(color: ASColors.error)),
+            leading: Icon(Icons.logout, color: theme.colorScheme.error),
+            title: Text('退出登录', style: TextStyle(color: theme.colorScheme.error)),
             onTap: () {
               Navigator.pop(context);
               ref.read(supabaseAuthRepositoryProvider).signOut();
@@ -229,13 +219,12 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
   /// 问候区块
   Widget _buildGreetingSection(bool isDark) {
     final currentUser = ref.watch(currentUserProvider);
+    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.all(ASSpacing.pagePadding),
-      child: ASGlassContainer.adaptive(
+      child: ASCard.glass(
         padding: const EdgeInsets.all(ASSpacing.cardPadding),
-        blur: isDark ? ASColors.glassBlurSigma : ASColors.glassBlurSigmaLight,
-        opacity: 0.9,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -245,9 +234,8 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
                   name: currentUser?.fullName ?? 'Parent',
                   size: ASAvatarSize.lg,
                   showBorder: true,
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                  animate: true,
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  foregroundColor: theme.colorScheme.onPrimaryContainer,
                 ),
                 const SizedBox(width: ASSpacing.md),
                 Expanded(
@@ -256,7 +244,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
                     children: [
                       Text(
                         'Hi, ${currentUser?.fullName ?? 'Parent'}',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        style: theme.textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
                       ),
@@ -265,7 +253,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
                         _children.isEmpty
                             ? '欢迎回来'
                             : '您有 ${_children.length} 位小孩在训练',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: theme.textTheme.bodySmall,
                       ),
                     ],
                   ),
@@ -298,9 +286,6 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
 
   /// 孩子出勤区块
   Widget _buildChildrenAttendanceSection(bool isDark) {
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
-
     if (_isLoading) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding),
@@ -337,8 +322,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
           padding: const EdgeInsets.only(bottom: ASSpacing.md),
           child: _ChildAttendanceCard(
             child: entry.value,
-            animationIndex: entry.key,
-          ),
+          ).animate(delay: (entry.key * 100).ms).fadeIn().slideX(),
         )).toList(),
       ),
     );
@@ -346,9 +330,6 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
 
   /// 训练精彩区块
   Widget _buildMomentsSection(bool isDark) {
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
-
     return FutureBuilder<List<TimelinePost>>(
       future: _fetchMoments(),
       builder: (context, snapshot) {
@@ -372,7 +353,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
         if (posts.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding),
-            child: ASEmptyState(
+            child: const ASEmptyState(
               type: ASEmptyStateType.noData,
               title: '暂无训练精彩时刻',
               description: '关注孩子的每一次突破，这里会展示最新动态',
@@ -389,7 +370,10 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
             itemCount: posts.length > 5 ? 5 : posts.length,
             itemBuilder: (context, index) {
               final post = posts[index];
-              return _MomentCard(post: post, animationIndex: index);
+              return _MomentCard(post: post)
+                  .animate(delay: (index * 50).ms)
+                  .fadeIn()
+                  .slideX();
             },
           ),
         );
@@ -436,9 +420,8 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
               padding: const EdgeInsets.only(bottom: ASSpacing.md),
               child: _NoticeListItem(
                 notice: entry.value,
-                animationIndex: entry.key,
                 onTap: () => _showNoticeDetail(entry.value),
-              ),
+              ).animate(delay: (entry.key * 50).ms).fadeIn().slideX(),
             )).toList(),
           ),
         );
@@ -488,22 +471,20 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
 class _ChildAttendanceCard extends ConsumerWidget {
   const _ChildAttendanceCard({
     required this.child,
-    this.animationIndex = 0,
   });
 
   final Student child;
-  final int animationIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    
     return FutureBuilder<StudentAttendanceSummary>(
       future: _fetchStudentSummary(ref, child.id, child.fullName),
       builder: (context, snapshot) {
         final summary = snapshot.data;
 
         return ASCard.glass(
-          animate: true,
-          animationIndex: animationIndex,
           padding: const EdgeInsets.all(ASSpacing.cardPadding),
           child: Row(
             children: [
@@ -529,7 +510,7 @@ class _ChildAttendanceCard extends ConsumerWidget {
                     const SizedBox(height: ASSpacing.xs),
                     Text(
                       '剩余课时 ${child.remainingSessions}/${child.totalSessions}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall,
                     ),
                   ],
                 ),
@@ -548,7 +529,7 @@ class _ChildAttendanceCard extends ConsumerWidget {
                   const SizedBox(height: ASSpacing.xs),
                   Text(
                     '${DateFormatters.month(DateTime.now())}出勤',
-                    style: Theme.of(context).textTheme.labelSmall,
+                    style: theme.textTheme.labelSmall,
                   ),
                 ],
               ),
@@ -586,24 +567,20 @@ class _ChildAttendanceCard extends ConsumerWidget {
 class _MomentCard extends StatelessWidget {
   const _MomentCard({
     required this.post,
-    this.animationIndex = 0,
   });
 
   final TimelinePost post;
-  final int animationIndex;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dividerColor = isDark ? ASColorsDark.divider : ASColors.divider;
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
+    final theme = Theme.of(context);
+    final dividerColor = theme.dividerColor;
+    final hintColor = theme.hintColor;
 
     return Container(
       width: 160,
       margin: const EdgeInsets.only(right: ASSpacing.md),
       child: ASCard(
-        animate: true,
-        animationIndex: animationIndex,
         padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -678,7 +655,7 @@ class _MomentCard extends StatelessWidget {
                     const Spacer(),
                     Text(
                       DateFormatters.relativeTime(post.createdAt),
-                      style: Theme.of(context).textTheme.labelSmall,
+                      style: theme.textTheme.labelSmall,
                     ),
                   ],
                 ),
@@ -696,18 +673,16 @@ class _NoticeListItem extends StatelessWidget {
   const _NoticeListItem({
     required this.notice, 
     required this.onTap,
-    this.animationIndex = 0,
   });
 
   final Notice notice;
   final VoidCallback onTap;
-  final int animationIndex;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return ASCard(
-      animate: true,
-      animationIndex: animationIndex,
       onTap: onTap,
       child: Row(
         children: [
@@ -752,7 +727,7 @@ class _NoticeListItem extends StatelessWidget {
                 const SizedBox(height: ASSpacing.xs),
                 Text(
                   notice.content,
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: theme.textTheme.bodySmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

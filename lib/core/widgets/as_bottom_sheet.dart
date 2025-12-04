@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../constants/animations.dart';
 import '../constants/spacing.dart';
 
 /// ASP 底部弹窗组件
 /// 
-/// 现代化设计，带拖拽指示器和动画效果
+/// 现代化设计，带拖拽指示器
 class ASBottomSheet extends StatelessWidget {
   const ASBottomSheet({
     super.key,
@@ -288,18 +286,7 @@ class ASBottomSheet extends StatelessWidget {
           SizedBox(height: mediaQuery.padding.bottom),
         ],
       ),
-    )
-        .animate()
-        .fadeIn(
-          duration: ASAnimations.modal,
-          curve: ASAnimations.smoothCurve,
-        )
-        .slideY(
-          begin: 0.1,
-          end: 0,
-          duration: ASAnimations.modal,
-          curve: ASAnimations.dialogCurve,
-        );
+    );
   }
 }
 

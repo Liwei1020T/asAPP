@@ -126,8 +126,8 @@ class _CoachListPageState extends ConsumerState<CoachListPage> {
   }
 
   Widget _buildEmpty(bool isDark) {
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
+    const hintColor = ASColors.textHint;
+    const secondaryColor = ASColors.textSecondary;
     
     return const ASEmptyState(
       type: ASEmptyStateType.noData,

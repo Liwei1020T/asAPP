@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
@@ -11,9 +10,6 @@ import 'features/auth/application/auth_initializer.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initSupabase();
-
-  // 配置 flutter_animate 默认设置
-  Animate.restartOnHotReload = true;
 
   runApp(
     const ProviderScope(
@@ -37,8 +33,6 @@ class ASPMSApp extends ConsumerWidget {
       title: 'ASP-MS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: themeMode,
       routerConfig: router,
     );
   }

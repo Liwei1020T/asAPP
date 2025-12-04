@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/date_formatters.dart';
@@ -12,6 +14,8 @@ import '../../../data/models/models.dart';
 import '../../../data/repositories/supabase/attendance_repository.dart';
 import '../../../data/repositories/supabase/sessions_repository.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../../data/repositories/supabase/auth_repository.dart';
+import '../../../data/repositories/supabase/student_repository.dart';
 import '../../../data/repositories/supabase/hr_repository.dart';
 
 /// 点名页面
@@ -32,6 +36,12 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   StreamSubscription<List<Attendance>>? _attendanceSub;
   StreamSubscription<List<String>>? _membersSub;
 
+  // Coach Check-in State
+  List<Profile> _coaches = [];
+  Profile? _selectedCoach;
+  List<CoachShift> _sessionShifts = [];
+  bool _isClockLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,38 +59,78 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     setState(() => _isLoading = true);
 
     try {
-      // 加载课程信息（Supabase）
+      // Load Session
       final session =
           await ref.read(supabaseSessionsRepositoryProvider).getSession(widget.sessionId);
 
       if (session != null) {
-        // 加载学生列表
+        // Load Students
         final students =
-          await ref.read(supabaseAttendanceRepositoryProvider).getStudentsForRollCall(
-                widget.sessionId,
-                session.classId,
-              );
+            await ref.read(supabaseAttendanceRepositoryProvider).getStudentsForRollCall(
+                  widget.sessionId,
+                  session.classId,
+                );
+
+        // Load Coaches
+        final coaches = await ref.read(supabaseAuthRepositoryProvider).getAllCoaches();
+        // Load Admins
+        final admins = await ref.read(supabaseAuthRepositoryProvider).getProfilesByRole(UserRole.admin);
+        
+        // Combine and remove duplicates
+        final allStaffMap = {
+          for (var p in coaches) p.id: p,
+          for (var p in admins) p.id: p,
+        };
+        final allStaff = allStaffMap.values.toList();
+        
+        final currentUser = ref.read(currentUserProvider);
 
         if (mounted) {
           setState(() {
             _session = session;
             _attendanceList = students;
-            _isLoading = false;
+            _coaches = allStaff;
+            // Default to assigned coach if available, otherwise current user, otherwise first
+            _selectedCoach = allStaff.firstWhere(
+              (c) => c.id == session.coachId,
+              orElse: () => allStaff.firstWhere(
+                (c) => c.id == currentUser?.id,
+                orElse: () => allStaff.isNotEmpty ? allStaff.first : currentUser!,
+              ),
+            );
           });
-          // 进入点名页即为本节课打卡上班
-          await _clockInForSession();
+
+          // Load shifts for this session
+          await _loadSessionShifts();
+
           _subscribeAttendance();
           _subscribeMembers();
         }
       }
     } catch (e) {
+      debugPrint('Error loading attendance data: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载失败：$e')),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  Future<void> _loadSessionShifts() async {
+    if (_session == null) return;
+    try {
+      final shifts = await ref.read(supabaseHrRepositoryProvider).getShiftsForSession(_session!.id);
+      if (mounted) {
+        setState(() {
+          _sessionShifts = shifts;
+        });
+      }
+    } catch (_) {}
   }
 
   void _updateStatus(int index, AttendanceStatus status) {
@@ -146,13 +196,14 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       await ref
           .read(supabaseAttendanceRepositoryProvider)
           .submitAttendance(widget.sessionId, _attendanceList);
-      // 点名提交成功后，为本节课打卡下班
-      await _clockOutForSession();
 
       // 统计
-      final presentCount = _attendanceList.where((a) => a.status == AttendanceStatus.present).length;
-      final absentCount = _attendanceList.where((a) => a.status == AttendanceStatus.absent).length;
-      final leaveCount = _attendanceList.where((a) => a.status == AttendanceStatus.leave).length;
+      final presentCount =
+          _attendanceList.where((a) => a.status == AttendanceStatus.present).length;
+      final absentCount =
+          _attendanceList.where((a) => a.status == AttendanceStatus.absent).length;
+      final leaveCount =
+          _attendanceList.where((a) => a.status == AttendanceStatus.leave).length;
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -164,7 +215,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
         );
 
         // 返回上一页
-        context.pop();
+        // context.pop(); // Allow editing after save
       }
     } catch (e) {
       if (mounted) {
@@ -182,37 +233,95 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     }
   }
 
-  Future<void> _clockInForSession() async {
+  Future<void> _clockInForCoach(Profile coach) async {
     final session = _session;
-    final currentUser = ref.read(currentUserProvider);
-    if (session == null || currentUser == null) return;
+    if (session == null) return;
+
+    setState(() => _isClockLoading = true);
 
     try {
       await ref.read(supabaseHrRepositoryProvider).clockInForSession(
-            coachId: currentUser.id,
+            coachId: coach.id,
             sessionId: session.id,
             classId: session.classId,
             className: session.className ?? (session.title ?? ''),
             sessionStartTime: session.startTime,
           );
-    } catch (_) {
-      // 打卡失败不阻塞点名流程，静默处理或按需增加提示
+      await _loadSessionShifts(); // Reload list
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已添加 ${coach.fullName}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('添加失败：$e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isClockLoading = false);
     }
   }
 
-  Future<void> _clockOutForSession() async {
+  Future<void> _clockOutForCoach(Profile coach) async {
     final session = _session;
-    final currentUser = ref.read(currentUserProvider);
-    if (session == null || currentUser == null) return;
+    if (session == null) return;
+
+    setState(() => _isClockLoading = true);
 
     try {
       await ref.read(supabaseHrRepositoryProvider).clockOutForSession(
-            coachId: currentUser.id,
+            coachId: coach.id,
             sessionId: session.id,
           );
-    } catch (_) {
-      // 下班打卡失败同样不影响点名结果
+      await _loadSessionShifts(); // Reload list
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${coach.fullName} 已完成')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('完成失败：$e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isClockLoading = false);
     }
+  }
+
+  Future<void> _showAddStudentDialog() async {
+    final student = await showDialog<Student>(
+      context: context,
+      builder: (context) => _SearchStudentDialog(),
+    );
+
+    if (student != null) {
+      _addGuestStudent(student);
+    }
+  }
+
+  void _addGuestStudent(Student student) {
+    // Check if already exists
+    if (_attendanceList.any((a) => a.studentId == student.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该学生已在列表中')),
+      );
+      return;
+    }
+
+    setState(() {
+      _attendanceList.add(Attendance(
+        id: 'temp-${DateTime.now().millisecondsSinceEpoch}', // Temp ID
+        sessionId: widget.sessionId,
+        studentId: student.id,
+        status: AttendanceStatus.present, // Default to present
+        studentName: student.fullName,
+        studentAvatarUrl: student.avatarUrl,
+      ));
+    });
   }
 
   @override
@@ -226,20 +335,23 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
         ),
       ),
       body: _isLoading
-          ? Padding(
-              padding: const EdgeInsets.all(ASSpacing.pagePadding),
+          ? const Padding(
+              padding: EdgeInsets.all(ASSpacing.pagePadding),
               child: ASSkeletonList(itemCount: 6, hasAvatar: true),
             )
           : Column(
               children: [
-                // 课程信息条
+                // 课程信息卡片（优化后）
                 _buildSessionInfoBar(),
-                
+
+                // 教练打卡区域（优化后）
+                _buildCoachCheckInSection(),
+
                 // 学生列表
                 Expanded(
                   child: _buildStudentList(),
                 ),
-                
+
                 // 底部提交按钮
                 _buildSubmitBar(),
               ],
@@ -247,36 +359,273 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     );
   }
 
+  /// 优化后的课程信息区域：使用卡片 + 图标 + 清晰排版
   Widget _buildSessionInfoBar() {
     if (_session == null) return const SizedBox();
+    final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: ASSpacing.pagePadding,
-        vertical: ASSpacing.md,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ASSpacing.pagePadding,
+        ASSpacing.pagePadding,
+        ASSpacing.pagePadding,
+        ASSpacing.sm,
       ),
-      color: ASColors.primary.withValues(alpha: 0.1),
-      child: Row(
-        children: [
-          Icon(Icons.calendar_today, size: 16, color: ASColors.primary),
-          const SizedBox(width: ASSpacing.sm),
-          Text(
-            DateFormatters.friendlyDate(_session!.startTime),
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(width: ASSpacing.lg),
-          Icon(Icons.access_time, size: 16, color: ASColors.primary),
-          const SizedBox(width: ASSpacing.sm),
-          Text(
-            DateFormatters.timeRange(_session!.startTime, _session!.endTime),
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-          const Spacer(),
-          ASTag(
-            label: '共 ${_attendanceList.length} 人',
-            type: ASTagType.primary,
-          ),
-        ],
+      child: ASCard(
+        padding: const EdgeInsets.all(ASSpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 左侧课程图标块
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.class_outlined,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(width: ASSpacing.md),
+
+            // 中间课程信息
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _session!.className ?? (_session!.title ?? '课程'),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: ASSpacing.xs),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today,
+                          size: 14, color: theme.colorScheme.primary),
+                      const SizedBox(width: ASSpacing.xs),
+                      Text(
+                        DateFormatters.friendlyDate(_session!.startTime),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(width: ASSpacing.md),
+                      Icon(Icons.access_time,
+                          size: 14, color: theme.colorScheme.primary),
+                      const SizedBox(width: ASSpacing.xs),
+                      Text(
+                        DateFormatters.timeRange(
+                          _session!.startTime,
+                          _session!.endTime,
+                        ),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: ASSpacing.sm),
+
+            // 右侧操作：补课 + 人数
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: _showAddStudentDialog,
+                  icon: const Icon(Icons.person_add_alt, size: 18),
+                  label: const Text('添加补课'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
+                const SizedBox(height: ASSpacing.xs),
+                ASTag(
+                  label: '共 ${_attendanceList.length} 人',
+                  type: ASTagType.primary,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 优化后的教练打卡区域：卡片 + 列表 + 下拉选择
+  Widget _buildCoachCheckInSection() {
+    final theme = Theme.of(context);
+
+    // Filter out coaches who are already in the shift list
+    final availableCoaches =
+        _coaches.where((c) => !_sessionShifts.any((s) => s.coachId == c.id)).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ASSpacing.pagePadding,
+        0,
+        ASSpacing.pagePadding,
+        ASSpacing.md,
+      ),
+      child: ASCard(
+        padding: const EdgeInsets.all(ASSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section 标题
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.badge_outlined,
+                    size: 18,
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(width: ASSpacing.sm),
+                Text(
+                  '教练列表',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ASSpacing.md),
+
+            // 已有打卡记录列表
+            if (_sessionShifts.isNotEmpty)
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _sessionShifts.length,
+                separatorBuilder: (context, index) =>
+                    const Divider(height: 12),
+                itemBuilder: (context, index) {
+                  final shift = _sessionShifts[index];
+                  final coach = _coaches.firstWhere(
+                    (c) => c.id == shift.coachId,
+                    orElse: () => Profile(
+                      id: shift.coachId,
+                      fullName: '未知教练',
+                      role: UserRole.coach,
+                    ),
+                  );
+                  final isCompleted = shift.status == ShiftStatus.completed;
+
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: ASAvatar(
+                      name: coach.fullName,
+                      imageUrl: coach.avatarUrl,
+                      size: ASAvatarSize.sm,
+                    ),
+                    title: Text(
+                      coach.fullName,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      isCompleted
+                          ? '已完成 ${DateFormatters.time(shift.clockInAt!)} - ${DateFormatters.time(shift.clockOutAt!)}'
+                          : '工作中 · 上班 ${DateFormatters.time(shift.clockInAt!)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: isCompleted
+                            ? ASColors.success
+                            : ASColors.warning,
+                      ),
+                    ),
+                    trailing: isCompleted
+                        ? const Icon(
+                            Icons.check_circle,
+                            color: ASColors.success,
+                          )
+                        : TextButton(
+                            onPressed:
+                                _isClockLoading ? null : () => _clockOutForCoach(coach),
+                            child: const Text('完成'),
+                          ),
+                  );
+                },
+              ),
+
+            if (_sessionShifts.isNotEmpty) const SizedBox(height: ASSpacing.md),
+
+            // 新教练打卡
+            if (availableCoaches.isNotEmpty && _isSessionActive())
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: availableCoaches
+                              .any((c) => c.id == _selectedCoach?.id)
+                          ? _selectedCoach?.id
+                          : null,
+                      decoration: const InputDecoration(
+                        labelText: '选择教练',
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(),
+                      ),
+                      items: availableCoaches
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c.id,
+                              child: Text(c.fullName),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (id) {
+                        if (id != null) {
+                          setState(() {
+                            _selectedCoach =
+                                _coaches.firstWhere((c) => c.id == id);
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: ASSpacing.md),
+                  ASPrimaryButton(
+                    label: '添加',
+                    icon: Icons.add,
+                    isLoading: _isClockLoading,
+                    onPressed: () {
+                      if (_selectedCoach != null) {
+                        _clockInForCoach(_selectedCoach!);
+                      }
+                    },
+                  ),
+                ],
+              )
+            else if (!_isSessionActive())
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  '不在添加时间范围内',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                ),
+              ),
+
+            if (availableCoaches.isEmpty && _sessionShifts.isEmpty)
+              Text(
+                '暂无人员可添加',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -291,15 +640,12 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       );
     }
 
-    return ListView.separated(
+    return ASAnimatedList(
       padding: const EdgeInsets.all(ASSpacing.pagePadding),
-      itemCount: _attendanceList.length,
-      separatorBuilder: (_, __) => const SizedBox(height: ASSpacing.md),
-      itemBuilder: (context, index) {
-        final attendance = _attendanceList[index];
+      items: _attendanceList,
+      itemBuilder: (context, attendance, index) {
         return _StudentAttendanceCard(
           attendance: attendance,
-          animationIndex: index,
           onStatusChanged: (status) => _updateStatus(index, status),
         );
       },
@@ -307,15 +653,48 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   }
 
   Widget _buildSubmitBar() {
-    final presentCount = _attendanceList.where((a) => a.status == AttendanceStatus.present).length;
+    final presentCount =
+        _attendanceList.where((a) => a.status == AttendanceStatus.present).length;
+    final theme = Theme.of(context);
+    
+    // Check if session is active (allow 30 mins before and after)
+    final isActive = _isSessionActive();
+    final canSubmit = isActive || _session?.status == SessionStatus.completed; // Allow editing if already completed? Or strict time?
+    // User request: "Coach can only check in/roll call during class time"
+    // Let's interpret strictly for "actions", but maybe allow viewing.
+    
+    // Actually, if session is completed, maybe we allow editing? 
+    // But the request says "only in course time segment".
+    // Let's enforce strict time window for ACTIONS.
+    
+    if (!isActive) {
+       return Container(
+        padding: const EdgeInsets.all(ASSpacing.pagePadding),
+        color: theme.colorScheme.surface,
+        child: SafeArea(
+          child: Row(
+            children: [
+              Icon(Icons.lock_clock, color: theme.colorScheme.outline),
+              const SizedBox(width: ASSpacing.sm),
+              Expanded(
+                child: Text(
+                  '仅能在课程时间段内进行点名',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(ASSpacing.pagePadding),
       decoration: BoxDecoration(
-        color: ASColors.surface,
+        color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: ASColors.shadow,
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -323,7 +702,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       ),
       child: SafeArea(
         child: ASPrimaryButton(
-          label: '提交点名（$presentCount 人出席）',
+          label: '保存点名（$presentCount 人出席）',
           onPressed: _submitAttendance,
           isLoading: _isSubmitting,
           isFullWidth: true,
@@ -332,6 +711,19 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       ),
     );
   }
+
+  bool _isSessionActive() {
+    // Admins can always take attendance
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser?.role == UserRole.admin) return true;
+
+    if (_session == null) return false;
+    final now = DateTime.now();
+    // Strict class hour check as requested
+    final start = _session!.startTime;
+    final end = _session!.endTime;
+    return now.isAfter(start) && now.isBefore(end);
+  }
 }
 
 /// 学生点名卡片
@@ -339,86 +731,75 @@ class _StudentAttendanceCard extends StatelessWidget {
   const _StudentAttendanceCard({
     required this.attendance,
     required this.onStatusChanged,
-    this.animationIndex = 0,
   });
 
   final Attendance attendance;
   final ValueChanged<AttendanceStatus> onStatusChanged;
-  final int animationIndex;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return ASCard(
-      animate: true,
-      animationIndex: animationIndex,
-      child: Row(
+      child: Column(
         children: [
-          // 头像
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: ASColors.info.withValues(alpha: 0.1),
-            backgroundImage: attendance.studentAvatarUrl != null
-                ? NetworkImage(attendance.studentAvatarUrl!)
-                : null,
-            child: attendance.studentAvatarUrl == null
-                ? Text(
-                    (attendance.studentName ?? 'S').substring(0, 1),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: ASColors.info,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: ASSpacing.md),
-
-          // 学生信息
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  attendance.studentName ?? '未知学生',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: ASSpacing.xs),
-                Text(
-                  '累计出席 ${attendance.studentTotalAttended ?? 0} 次',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-
-          // 状态按钮组
           Row(
             children: [
-              _StatusButton(
-                label: '出席',
-                icon: Icons.check,
-                isSelected: attendance.status == AttendanceStatus.present,
-                color: ASColors.present,
-                onTap: () => onStatusChanged(AttendanceStatus.present),
+              ASAvatar(
+                imageUrl: attendance.studentAvatarUrl,
+                name: attendance.studentName ?? 'S',
+                size: ASAvatarSize.md,
+                showBorder: true,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                foregroundColor: theme.colorScheme.onPrimaryContainer,
+              ),
+              const SizedBox(width: ASSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      attendance.studentName ?? '未知学生',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    // Removed Cumulative Attendance display as requested
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: ASSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: _StatusButton(
+                  label: '出席',
+                  icon: Icons.check,
+                  isSelected: attendance.status == AttendanceStatus.present,
+                  color: ASColors.success,
+                  onTap: () => onStatusChanged(AttendanceStatus.present),
+                ),
               ),
               const SizedBox(width: ASSpacing.sm),
-              _StatusButton(
-                label: '缺席',
-                icon: Icons.close,
-                isSelected: attendance.status == AttendanceStatus.absent,
-                color: ASColors.absent,
-                onTap: () => onStatusChanged(AttendanceStatus.absent),
+              Expanded(
+                child: _StatusButton(
+                  label: '缺席',
+                  icon: Icons.close,
+                  isSelected: attendance.status == AttendanceStatus.absent,
+                  color: ASColors.error,
+                  onTap: () => onStatusChanged(AttendanceStatus.absent),
+                ),
               ),
               const SizedBox(width: ASSpacing.sm),
-              _StatusButton(
-                label: '请假',
-                icon: Icons.event_busy,
-                isSelected: attendance.status == AttendanceStatus.leave,
-                color: ASColors.leave,
-                onTap: () => onStatusChanged(AttendanceStatus.leave),
+              Expanded(
+                child: _StatusButton(
+                  label: '请假',
+                  icon: Icons.event_busy,
+                  isSelected: attendance.status == AttendanceStatus.leave,
+                  color: ASColors.warning,
+                  onTap: () => onStatusChanged(AttendanceStatus.leave),
+                ),
               ),
             ],
           ),
@@ -451,8 +832,7 @@ class _StatusButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(
-          horizontal: ASSpacing.sm,
-          vertical: ASSpacing.xs,
+          vertical: ASSpacing.sm,
         ),
         decoration: BoxDecoration(
           color: isSelected ? color : color.withValues(alpha: 0.1),
@@ -463,7 +843,7 @@ class _StatusButton extends StatelessWidget {
           ),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
@@ -474,9 +854,119 @@ class _StatusButton extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
                 color: isSelected ? Colors.white : color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchStudentDialog extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_SearchStudentDialog> createState() =>
+      _SearchStudentDialogState();
+}
+
+class _SearchStudentDialogState extends ConsumerState<_SearchStudentDialog> {
+  final _searchController = TextEditingController();
+  List<Student> _results = [];
+  bool _isLoading = false;
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (query.isNotEmpty) {
+        _search(query);
+      } else {
+        setState(() => _results = []);
+      }
+    });
+  }
+
+  Future<void> _search(String query) async {
+    setState(() => _isLoading = true);
+    try {
+      final results =
+          await ref.read(supabaseStudentRepositoryProvider).searchStudents(query);
+      if (mounted) {
+        setState(() {
+          _results = results;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: 400,
+        height: 500,
+        padding: const EdgeInsets.all(ASSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '添加补课学生',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: ASSpacing.md),
+            TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: '搜索学生姓名...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+              onChanged: _onSearchChanged,
+            ),
+            const SizedBox(height: ASSpacing.md),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _results.isEmpty
+                      ? const Center(child: Text('输入姓名搜索'))
+                      : ListView.builder(
+                          itemCount: _results.length,
+                          itemBuilder: (context, index) {
+                            final student = _results[index];
+                            return ListTile(
+                              leading: ASAvatar(
+                                imageUrl: student.avatarUrl,
+                                name: student.fullName,
+                                size: ASAvatarSize.sm,
+                              ),
+                              title: Text(student.fullName),
+                              subtitle: Text(student.phoneNumber ?? '无电话'),
+                              onTap: () => Navigator.pop(context, student),
+                            );
+                          },
+                        ),
+            ),
+            const SizedBox(height: ASSpacing.md),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
               ),
             ),
           ],

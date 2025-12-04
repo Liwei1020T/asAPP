@@ -143,8 +143,8 @@ class _NoticeListPageState extends ConsumerState<NoticeListPage> {
   }
 
   Widget _buildEmpty(bool isDark) {
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
+    const hintColor = ASColors.textHint;
+    const secondaryColor = ASColors.textSecondary;
     
     return ASCard(
       animate: true,
@@ -267,7 +267,7 @@ class _NoticeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
+    const secondaryColor = ASColors.textSecondary;
     
     return Padding(
       padding: const EdgeInsets.only(bottom: ASSpacing.md),

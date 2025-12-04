@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
@@ -12,8 +12,7 @@ import '../../../data/models/student.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
 import '../application/auth_providers.dart';
 
-/// 绑定孩子页面
-/// 家长验证邮箱后进入此页面，系统自动匹配孩子并支持手动绑定
+/// 绑定孩子页面 - 现代化重构版
 class LinkChildrenPage extends ConsumerStatefulWidget {
   final String phoneNumber;
 
@@ -31,14 +30,10 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
   bool _isBinding = false;
   bool _isSearching = false;
 
-  // 自动匹配到的学生列表
   List<Student> _matchedStudents = [];
-  // 选中的学生ID
   final Set<String> _selectedStudentIds = {};
-  // 已绑定的学生列表
   List<Student> _linkedStudents = [];
 
-  // 手动搜索表单
   final _searchFormKey = GlobalKey<FormState>();
   final _searchNameController = TextEditingController();
   final _searchPhoneController = TextEditingController();
@@ -66,20 +61,15 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
       final currentUser = ref.read(currentUserProvider);
 
       if (currentUser == null) {
-        if (mounted) {
-          context.go('/login');
-        }
+        if (mounted) context.go('/login');
         return;
       }
 
-      // 获取已绑定的学生
       final linkedStudents = await authRepo.getLinkedStudents(currentUser.id);
 
-      // 根据手机号自动匹配学生
       List<Student> matchedStudents = [];
       if (widget.phoneNumber.isNotEmpty) {
         matchedStudents = await authRepo.findStudentsByPhone(widget.phoneNumber);
-        // 排除已绑定的学生
         final linkedIds = linkedStudents.map((s) => s.id).toSet();
         matchedStudents = matchedStudents
             .where((s) => !linkedIds.contains(s.id) && s.parentId == null)
@@ -90,7 +80,6 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
         setState(() {
           _linkedStudents = linkedStudents;
           _matchedStudents = matchedStudents;
-          // 默认选中所有匹配到的学生
           _selectedStudentIds.addAll(matchedStudents.map((s) => s.id));
           _isLoading = false;
         });
@@ -117,9 +106,7 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
       final authRepo = ref.read(supabaseAuthRepositoryProvider);
       final currentUser = ref.read(currentUserProvider);
 
-      if (currentUser == null) {
-        throw Exception('用户未登录');
-      }
+      if (currentUser == null) throw Exception('用户未登录');
 
       await authRepo.bindStudentsToParent(
         parentId: currentUser.id,
@@ -163,7 +150,6 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
         phoneNumber: _searchPhoneController.text.trim(),
       );
 
-      // 排除已绑定的学生和已在匹配列表中的学生
       final excludeIds = {
         ..._linkedStudents.map((s) => s.id),
         ..._matchedStudents.map((s) => s.id),
@@ -211,57 +197,89 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(ASSpacing.xl),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
-              child: _isLoading
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: const [
-                        ASSkeletonProfileCard(),
-                        SizedBox(height: ASSpacing.md),
-                        ASSkeletonProfileCard(),
-                        SizedBox(height: ASSpacing.md),
-                        ASSkeletonProfileCard(),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildHeader(theme),
-                        const SizedBox(height: ASSpacing.xxl),
-                        if (_linkedStudents.isNotEmpty) ...[
-                          _buildLinkedStudentsSection(theme),
-                          const SizedBox(height: ASSpacing.xl),
-                        ],
-                        if (_matchedStudents.isNotEmpty) ...[
-                          _buildMatchedStudentsSection(theme),
-                          const SizedBox(height: ASSpacing.xl),
-                        ],
-                        if (_linkedStudents.isEmpty && _matchedStudents.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: ASSpacing.xl),
-                            child: ASEmptyState(
-                              type: ASEmptyStateType.noData,
-                              title: '未找到可绑定的孩子',
-                              description: '您可以手动搜索孩子姓名或电话进行绑定',
-                              icon: Icons.family_restroom,
-                              actionLabel: _showSearchForm ? null : '手动搜索',
-                              onAction: () => setState(() => _showSearchForm = true),
-                            ),
-                          ),
-                        _buildManualSearchSection(theme),
-                        const SizedBox(height: ASSpacing.xxl),
-                        _buildActions(theme),
-                      ],
-                    ),
+      body: Stack(
+        children: [
+          // 动态背景
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFFF5F7FA), const Color(0xFFE4E9F2)],
+                ),
+              ),
             ),
           ),
-        ),
+          
+          // 装饰性背景圆
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              ),
+            ).animate().scale(duration: 2.seconds, curve: Curves.easeInOut).fadeIn(),
+          ),
+
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(ASSpacing.xl),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: _isLoading
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: const [
+                            ASSkeletonProfileCard(),
+                            SizedBox(height: ASSpacing.md),
+                            ASSkeletonProfileCard(),
+                            SizedBox(height: ASSpacing.md),
+                            ASSkeletonProfileCard(),
+                          ],
+                        ).animate().fadeIn()
+                      : ASStaggeredColumn(
+                          animate: true,
+                          children: [
+                            _buildHeader(theme),
+                            const SizedBox(height: ASSpacing.xxl),
+                            if (_linkedStudents.isNotEmpty) ...[
+                              _buildLinkedStudentsSection(theme),
+                              const SizedBox(height: ASSpacing.xl),
+                            ],
+                            if (_matchedStudents.isNotEmpty) ...[
+                              _buildMatchedStudentsSection(theme),
+                              const SizedBox(height: ASSpacing.xl),
+                            ],
+                            if (_linkedStudents.isEmpty && _matchedStudents.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: ASSpacing.xl),
+                                child: ASEmptyState(
+                                  type: ASEmptyStateType.noData,
+                                  title: '未找到可绑定的孩子',
+                                  description: '您可以手动搜索孩子姓名或电话进行绑定',
+                                  icon: Icons.family_restroom,
+                                  actionLabel: _showSearchForm ? null : '手动搜索',
+                                  onAction: () => setState(() => _showSearchForm = true),
+                                ),
+                              ),
+                            _buildManualSearchSection(theme),
+                            const SizedBox(height: ASSpacing.xxl),
+                            _buildActions(theme),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -294,7 +312,7 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
               size: 48,
               color: primaryColor,
             ),
-          ),
+          ).animate().scale(duration: ASAnimations.medium, curve: ASAnimations.emphasized),
           const SizedBox(height: ASSpacing.lg),
           Text(
             '绑定您的孩子',
@@ -343,7 +361,7 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
             theme,
             student,
             isLinked: true,
-          ).animate(delay: (200 + index * 50).ms).fadeIn().slideX(begin: -0.1);
+          );
         }),
       ],
     );
@@ -393,7 +411,7 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
                 }
               });
             },
-          ).animate(delay: (250 + index * 50).ms).fadeIn().slideX(begin: -0.1);
+          );
         }),
       ],
     );
@@ -417,7 +435,9 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
       borderColor: borderColor,
       borderWidth: isLinked || isSelected ? 1.5 : 1,
       glassOpacity: 0.85,
+      onTap: isLinked ? null : onToggle,
       child: ListTile(
+        contentPadding: EdgeInsets.zero,
         leading: ASAvatar(
           name: student.fullName,
           size: ASAvatarSize.sm,
@@ -452,7 +472,6 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
                     color: theme.colorScheme.primary,
                     onPressed: () => _addSearchResultToSelected(student),
                   ),
-        onTap: isLinked ? null : onToggle,
       ),
     );
   }
@@ -471,7 +490,7 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
           child: Container(
             padding: const EdgeInsets.all(ASSpacing.md),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
             ),
             child: Row(
@@ -498,16 +517,15 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
               ],
             ),
           ),
-        )
-            .animate(delay: 300.ms)
-            .fadeIn(duration: ASAnimations.normal),
+        ),
         if (_showSearchForm) ...[
           const SizedBox(height: ASSpacing.md),
           Container(
             padding: const EdgeInsets.all(ASSpacing.lg),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
+              border: Border.all(color: theme.dividerColor.withValues(alpha: 0.5)),
             ),
             child: Form(
               key: _searchFormKey,
@@ -540,10 +558,7 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
                 ],
               ),
             ),
-          )
-              .animate()
-              .fadeIn(duration: ASAnimations.fast)
-              .slideY(begin: -0.1, end: 0),
+          ).animate().fadeIn().slideY(begin: -0.1, end: 0),
           if (_searchResults.isNotEmpty) ...[
             const SizedBox(height: ASSpacing.md),
             Text(
@@ -558,7 +573,7 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
               return _buildStudentCard(
                 theme,
                 student,
-              ).animate(delay: (50 * index).ms).fadeIn().slideX(begin: -0.1);
+              );
             }),
           ],
         ],
@@ -580,7 +595,6 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
           isFullWidth: true,
           height: 52,
           animate: true,
-          animationDelay: 350.ms,
         ),
         if (hasSelection) ...[
           const SizedBox(height: ASSpacing.md),
@@ -592,9 +606,7 @@ class _LinkChildrenPageState extends ConsumerState<LinkChildrenPage> {
                 color: theme.textTheme.bodySmall?.color,
               ),
             ),
-          )
-              .animate(delay: 400.ms)
-              .fadeIn(duration: ASAnimations.normal),
+          ),
         ],
       ],
     );

@@ -702,3 +702,239 @@ create policy "avatars_write_self_or_admin" on storage.objects
       )
     )
   );
+
+-- =====================================================
+-- APPENDED SCRIPTS FROM SUPABASE DIRECTORY
+-- =====================================================
+
+-- =====================================================
+-- create_buckets.sql
+-- =====================================================
+-- Create 'playbook' bucket
+insert into storage.buckets (id, name, public)
+values ('playbook', 'playbook', true)
+on conflict (id) do nothing;
+
+-- Create 'timeline' bucket
+insert into storage.buckets (id, name, public)
+values ('timeline', 'timeline', true)
+on conflict (id) do nothing;
+
+-- Policy: Public Access for Playbook
+create policy "Public Access Playbook"
+  on storage.objects for select
+  using ( bucket_id = 'playbook' );
+
+-- Policy: Authenticated users can upload to Playbook
+create policy "Authenticated Upload Playbook"
+  on storage.objects for insert
+  with check ( bucket_id = 'playbook' and auth.role() = 'authenticated' );
+
+-- Policy: Users can update their own files in Playbook
+create policy "Owner Update Playbook"
+  on storage.objects for update
+  using ( bucket_id = 'playbook' and auth.uid() = owner );
+
+-- Policy: Users can delete their own files in Playbook
+create policy "Owner Delete Playbook"
+  on storage.objects for delete
+  using ( bucket_id = 'playbook' and auth.uid() = owner );
+
+-- Policy: Public Access for Timeline
+create policy "Public Access Timeline"
+  on storage.objects for select
+  using ( bucket_id = 'timeline' );
+
+-- Policy: Authenticated users can upload to Timeline
+create policy "Authenticated Upload Timeline"
+  on storage.objects for insert
+  with check ( bucket_id = 'timeline' and auth.role() = 'authenticated' );
+
+-- Policy: Users can update their own files in Timeline
+create policy "Owner Update Timeline"
+  on storage.objects for update
+  using ( bucket_id = 'timeline' and auth.uid() = owner );
+
+-- Policy: Users can delete their own files in Timeline
+create policy "Owner Delete Timeline"
+  on storage.objects for delete
+  using ( bucket_id = 'timeline' and auth.uid() = owner );
+
+-- =====================================================
+-- fix_attendance_trigger.sql
+-- =====================================================
+-- 修复/重建自动扣减课时的触发器
+
+-- 1. 创建或更新函数
+create or replace function public.update_student_sessions_from_attendance()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_student_id text;
+  v_delta      int := 0;
+begin
+  if TG_OP = 'INSERT' then
+    v_student_id := NEW.student_id;
+    if NEW.status in ('present', 'late') then
+      v_delta := -1;
+    end if;
+  elsif TG_OP = 'UPDATE' then
+    v_student_id := NEW.student_id;
+
+    if OLD.status in ('present', 'late') then
+      v_delta := v_delta + 1;
+    end if;
+    if NEW.status in ('present', 'late') then
+      v_delta := v_delta - 1;
+    end if;
+  elsif TG_OP = 'DELETE' then
+    v_student_id := OLD.student_id;
+    if OLD.status in ('present', 'late') then
+      v_delta := 1;
+    end if;
+  end if;
+
+  -- 没有变化则直接返回
+  if v_delta = 0 then
+    if TG_OP = 'DELETE' then
+      return OLD;
+    else
+      return NEW;
+    end if;
+  end if;
+
+  -- 更新 students 表
+  update students
+  set remaining_sessions = greatest(remaining_sessions + v_delta, 0),
+      updated_at         = now()
+  where id = v_student_id;
+
+  if TG_OP = 'DELETE' then
+    return OLD;
+  else
+    return NEW;
+  end if;
+end;
+$$;
+
+-- 2. 重建触发器
+drop trigger if exists trg_attendance_update_sessions on attendance;
+create trigger trg_attendance_update_sessions
+after insert or update or delete on attendance
+for each row
+execute function public.update_student_sessions_from_attendance();
+
+-- =====================================================
+-- fix_coach_shifts_fk.sql
+-- =====================================================
+-- 修复删除班级时的外键约束错误
+-- 允许删除班级时自动删除关联的教练排班记录
+
+ALTER TABLE coach_shifts
+DROP CONSTRAINT IF EXISTS coach_shifts_class_id_fkey;
+
+ALTER TABLE coach_shifts
+ADD CONSTRAINT coach_shifts_class_id_fkey
+FOREIGN KEY (class_id)
+REFERENCES class_groups(id)
+ON DELETE CASCADE;
+
+-- =====================================================
+-- update_sessions_rls.sql
+-- =====================================================
+-- Update RLS policies for sessions to allow claiming unassigned sessions
+
+-- Drop existing update policy
+drop policy if exists "sessions_update_admin_or_coach" on sessions;
+
+-- Create new update policy
+create policy "sessions_update_admin_or_coach" on sessions
+  for update
+  using (
+    auth.role() = 'authenticated'
+    and (
+      coach_id = auth.uid()
+      or actual_coach_id = auth.uid()
+      or coach_id is null -- Allow any coach to update if unassigned (to claim it)
+      or exists (
+        select 1 from profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  )
+  with check (
+    auth.role() = 'authenticated'
+    and (
+      coach_id = auth.uid()
+      or actual_coach_id = auth.uid()
+      or coach_id is null
+      or exists (
+        select 1 from profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  );
+
+-- Also update insert policy to allow coaches to create unassigned sessions if needed (optional, but good for flexibility)
+drop policy if exists "sessions_write_admin_or_coach" on sessions;
+
+create policy "sessions_write_admin_or_coach" on sessions
+  for insert
+  with check (
+    auth.role() = 'authenticated'
+    and (
+      coach_id = auth.uid()
+      or actual_coach_id = auth.uid()
+      or coach_id is null -- Allow creating unassigned sessions
+      or exists (
+        select 1 from profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  );
+
+-- =====================================================
+-- remove_duplicate_sessions.sql
+-- =====================================================
+-- Remove duplicate sessions
+-- Keeps one session for each (class_id, start_time) combination and deletes the others.
+
+DELETE FROM sessions
+WHERE id IN (
+  SELECT id
+  FROM (
+    SELECT id,
+    ROW_NUMBER() OVER (
+      PARTITION BY class_id, start_time
+      ORDER BY id
+    ) as row_num
+    FROM sessions
+  ) t
+  WHERE t.row_num > 1
+);
+
+-- =====================================================
+-- fix_delete_cascade.sql
+-- =====================================================
+-- Add ON DELETE CASCADE to coach_shifts.session_id
+ALTER TABLE coach_shifts
+DROP CONSTRAINT IF EXISTS coach_shifts_session_id_fkey;
+
+ALTER TABLE coach_shifts
+ADD CONSTRAINT coach_shifts_session_id_fkey
+FOREIGN KEY (session_id)
+REFERENCES sessions(id)
+ON DELETE CASCADE;
+
+-- Also ensure attendance table has cascade delete if not already
+ALTER TABLE attendance
+DROP CONSTRAINT IF EXISTS attendance_session_id_fkey;
+
+ALTER TABLE attendance
+ADD CONSTRAINT attendance_session_id_fkey
+FOREIGN KEY (session_id)
+REFERENCES sessions(id)
+ON DELETE CASCADE;

@@ -49,7 +49,11 @@ class SupabaseAttendanceRepository {
     }
 
     final result = <Attendance>[];
+    final processedStudentIds = <String>{};
+
+    // 1. Add class members
     for (final id in studentIds) {
+      processedStudentIds.add(id);
       if (attendanceByStudent.containsKey(id)) {
         result.add(attendanceByStudent[id]!);
       } else {
@@ -65,6 +69,13 @@ class SupabaseAttendanceRepository {
             studentTotalAttended: null,
           ),
         );
+      }
+    }
+
+    // 2. Add guests (in attendance but not in class members)
+    for (final entry in attendanceByStudent.entries) {
+      if (!processedStudentIds.contains(entry.key)) {
+        result.add(entry.value);
       }
     }
 

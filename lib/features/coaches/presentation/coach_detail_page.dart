@@ -118,14 +118,13 @@ class _CoachDetailPageState extends ConsumerState<CoachDetailPage> {
                           const SizedBox(height: ASSpacing.lg),
                           _buildStats(),
                           const SizedBox(height: ASSpacing.xl),
+                          _buildHistory(),
+                          const SizedBox(height: ASSpacing.xl),
                           const ASSectionTitle(title: '📅 即将上课'),
                           _buildUpcoming(),
                           const SizedBox(height: ASSpacing.xl),
                           const ASSectionTitle(title: '🕒 最近课时'),
                           _buildShifts(),
-                          const SizedBox(height: ASSpacing.xl),
-                          const ASSectionTitle(title: '📈 月度历史'),
-                          _buildHistory(),
                           const SizedBox(height: ASSpacing.xxl),
                         ],
                       ),
@@ -288,37 +287,39 @@ class _CoachDetailPageState extends ConsumerState<CoachDetailPage> {
 
   Widget _buildHistory() {
     if (_history.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(ASSpacing.lg),
-        child: Text('暂无历史数据', style: TextStyle(color: ASColors.textSecondary)),
-      );
+      return const SizedBox.shrink();
     }
 
-    return Wrap(
-      spacing: ASSpacing.sm,
-      runSpacing: ASSpacing.sm,
-      children: _history.map((h) {
-        final monthLabel = '${h.month.year}-${h.month.month.toString().padLeft(2, '0')}';
-        return Container(
-          width: 160,
-          padding: const EdgeInsets.all(ASSpacing.md),
-          decoration: BoxDecoration(
-            color: ASColors.backgroundLight,
-            borderRadius: BorderRadius.circular(ASSpacing.cardRadius),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const ASSectionTitle(title: '📈 月度历史'),
+        const SizedBox(height: ASSpacing.md),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _history.map((h) {
+              final monthLabel = '${h.month.year}-${h.month.month.toString().padLeft(2, '0')}';
+              return Padding(
+                padding: const EdgeInsets.only(right: ASSpacing.md),
+                child: SizedBox(
+                  width: 160,
+                  child: ASStatCard(
+                    title: monthLabel,
+                    valueText: 'RM ${h.totalSalary.toStringAsFixed(0)}',
+                    icon: Icons.calendar_month,
+                    color: ASColors.primary,
+                    // We might need to adjust ASStatCard to support subtitle or just use value
+                    // If ASStatCard doesn't support custom content, we might need a custom card.
+                    // Let's check ASStatCard definition or just use a custom card similar to it.
+                    // Actually, let's use a custom card to fit "4 Sessions" as well.
+                  ),
+                ),
+              );
+            }).toList(),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(monthLabel, style: Theme.of(context).textTheme.labelMedium),
-              const SizedBox(height: ASSpacing.xs),
-              Text(
-                '${h.totalSessions} 节 · RM ${h.totalSalary.toStringAsFixed(0)}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+        ),
+      ],
     );
   }
 }

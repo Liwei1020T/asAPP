@@ -23,6 +23,19 @@ class SupabaseHrRepository {
         .toList();
   }
 
+  /// 获取指定课程的所有教练打卡记录
+  Future<List<CoachShift>> getShiftsForSession(String sessionId) async {
+    final data = await supabaseClient
+        .from('coach_shifts')
+        .select()
+        .eq('session_id', sessionId)
+        .order('clock_in_at', ascending: true);
+
+    return (data as List)
+        .map((e) => CoachShift.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// 实时订阅指定月份的教练课时
   Stream<List<CoachShift>> watchCoachShifts(String coachId, DateTime month) {
     final start = DateTime(month.year, month.month, 1);

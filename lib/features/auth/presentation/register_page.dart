@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
@@ -10,7 +10,7 @@ import '../../../core/utils/validators.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
 
-/// 家长注册页面
+/// 家长注册页面 - 现代化重构版
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
 
@@ -62,7 +62,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     try {
       final authRepo = ref.read(supabaseAuthRepositoryProvider);
       
-      // 调用注册 API
       await authRepo.createParentAccount(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -71,7 +70,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       );
 
       if (mounted) {
-        // 跳转到邮箱验证页面，传递邮箱和手机号用于后续流程
         context.go('/verify-email', extra: {
           'email': _emailController.text.trim(),
           'phoneNumber': _phoneController.text.trim(),
@@ -106,185 +104,215 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(ASSpacing.xl),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: Stack(
+        children: [
+          // 动态背景
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFFF5F7FA), const Color(0xFFE4E9F2)],
+                ),
+              ),
+            ),
+          ),
+          
+          // 装饰性背景圆
+          Positioned(
+            bottom: -100,
+            left: -100,
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.secondary.withValues(alpha: 0.1),
+              ),
+            ).animate().scale(duration: 2.seconds, curve: Curves.easeInOut).fadeIn(),
+          ),
+
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(ASSpacing.lg),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ASStaggeredColumn(
+                  animate: true,
                   children: [
-                    _buildHeader(theme),
-                    const SizedBox(height: ASSpacing.xxl),
-                    _buildRegistrationForm(theme),
+                    // Logo 区域
+                    Center(
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.family_restroom,
+                          size: 40,
+                          color: Colors.white,
+                        ),
+                      ).animate().scale(duration: ASAnimations.medium, curve: ASAnimations.emphasized),
+                    ),
                     const SizedBox(height: ASSpacing.xl),
-                    _buildLoginLink(theme),
+                    
+                    // 标题
+                    Center(
+                      child: Text(
+                        '家长注册',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: ASSpacing.xs),
+                    Center(
+                      child: Text(
+                        '创建账号以关注孩子的训练动态',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.textTheme.bodySmall?.color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: ASSpacing.xxl),
+
+                    // 注册卡片
+                    ASCard.glass(
+                      padding: const EdgeInsets.all(ASSpacing.xl),
+                      glassOpacity: 0.8,
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ASTextField(
+                              controller: _fullNameController,
+                              label: '姓名',
+                              hint: '请输入您的姓名',
+                              prefixIcon: Icons.person_outlined,
+                              textInputAction: TextInputAction.next,
+                              validator: NameValidator.getErrorMessage,
+                            ),
+                            const SizedBox(height: ASSpacing.lg),
+
+                            ASTextField(
+                              controller: _emailController,
+                              label: '邮箱',
+                              hint: '请输入邮箱地址',
+                              prefixIcon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              validator: EmailValidator.getErrorMessage,
+                            ),
+                            const SizedBox(height: ASSpacing.lg),
+
+                            ASTextField(
+                              controller: _phoneController,
+                              label: '手机号',
+                              hint: '例如：0123456789',
+                              prefixIcon: Icons.phone_outlined,
+                              helperText: '用于匹配您孩子的账号',
+                              keyboardType: TextInputType.phone,
+                              textInputAction: TextInputAction.next,
+                              validator: PhoneValidator.getErrorMessage,
+                            ),
+                            const SizedBox(height: ASSpacing.lg),
+
+                            ASTextField(
+                              controller: _passwordController,
+                              label: '密码',
+                              hint: '请设置密码',
+                              prefixIcon: Icons.lock_outlined,
+                              obscureText: _obscurePassword,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                ),
+                                onPressed: () {
+                                  setState(() => _obscurePassword = !_obscurePassword);
+                                },
+                              ),
+                              textInputAction: TextInputAction.next,
+                              validator: PasswordValidator.getErrorMessage,
+                            ),
+                            const SizedBox(height: ASSpacing.sm),
+
+                            if (_passwordController.text.isNotEmpty && _passwordValidation != null)
+                              _buildPasswordStrengthIndicator(theme),
+                            const SizedBox(height: ASSpacing.lg),
+
+                            ASTextField(
+                              controller: _confirmPasswordController,
+                              label: '确认密码',
+                              hint: '请再次输入密码',
+                              prefixIcon: Icons.lock_outlined,
+                              obscureText: _obscureConfirmPassword,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                ),
+                                onPressed: () {
+                                  setState(
+                                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                                  );
+                                },
+                              ),
+                              textInputAction: TextInputAction.done,
+                              validator: (value) => ConfirmPasswordValidator.validate(
+                                value,
+                                _passwordController.text,
+                              ),
+                              onSubmitted: (_) => _register(),
+                            ),
+                            const SizedBox(height: ASSpacing.xl),
+
+                            ASPrimaryButton(
+                              label: '注册',
+                              onPressed: _register,
+                              isLoading: _isLoading,
+                              isFullWidth: true,
+                              height: 52,
+                              animate: true,
+                            ),
+                            const SizedBox(height: ASSpacing.lg),
+                            
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '已有账号？',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                                TextButton(
+                                  onPressed: () => context.go('/login'),
+                                  child: const Text('立即登录'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(ThemeData theme) {
-    final primaryColor = theme.colorScheme.primary;
-
-    return ASGlassContainer.adaptive(
-      padding: const EdgeInsets.all(ASSpacing.xl),
-      blur: ASColors.glassBlurSigma,
-      opacity: 0.9,
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: primaryColor,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.3),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.family_restroom,
-              size: 48,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: ASSpacing.lg),
-          Text(
-            '家长注册',
-            style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor,
-                ),
-          ),
-          const SizedBox(height: ASSpacing.xs),
-          Text(
-            '创建账号以关注孩子的训练动态',
-            style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.textTheme.bodySmall?.color,
-                ),
-          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildRegistrationForm(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 姓名
-        ASTextField(
-          controller: _fullNameController,
-          label: '姓名',
-          hint: '请输入您的姓名',
-          prefixIcon: Icons.person_outlined,
-          textInputAction: TextInputAction.next,
-          validator: NameValidator.getErrorMessage,
-        ),
-        const SizedBox(height: ASSpacing.lg),
-
-        // 邮箱
-        ASTextField(
-          controller: _emailController,
-          label: '邮箱',
-          hint: '请输入邮箱地址',
-          prefixIcon: Icons.email_outlined,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          validator: EmailValidator.getErrorMessage,
-        ),
-        const SizedBox(height: ASSpacing.lg),
-
-        // 手机号
-        ASTextField(
-          controller: _phoneController,
-          label: '手机号',
-          hint: '例如：0123456789',
-          prefixIcon: Icons.phone_outlined,
-          helperText: '用于匹配您孩子的账号',
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-          validator: PhoneValidator.getErrorMessage,
-        ),
-        const SizedBox(height: ASSpacing.lg),
-
-        // 密码
-        ASTextField(
-          controller: _passwordController,
-          label: '密码',
-          hint: '请设置密码',
-          prefixIcon: Icons.lock_outlined,
-          obscureText: _obscurePassword,
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePassword ? Icons.visibility_off : Icons.visibility,
-            ),
-            onPressed: () {
-              setState(() => _obscurePassword = !_obscurePassword);
-            },
-          ),
-          textInputAction: TextInputAction.next,
-          validator: PasswordValidator.getErrorMessage,
-        ),
-        const SizedBox(height: ASSpacing.sm),
-
-        // 密码强度指示器
-        if (_passwordController.text.isNotEmpty && _passwordValidation != null)
-          _buildPasswordStrengthIndicator(theme),
-        const SizedBox(height: ASSpacing.lg),
-
-        // 确认密码
-        ASTextField(
-          controller: _confirmPasswordController,
-          label: '确认密码',
-          hint: '请再次输入密码',
-          prefixIcon: Icons.lock_outlined,
-          obscureText: _obscureConfirmPassword,
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-            ),
-            onPressed: () {
-              setState(
-                () => _obscureConfirmPassword = !_obscureConfirmPassword,
-              );
-            },
-          ),
-          textInputAction: TextInputAction.done,
-          validator: (value) => ConfirmPasswordValidator.validate(
-            value,
-            _passwordController.text,
-          ),
-          onSubmitted: (_) => _register(),
-        ),
-        const SizedBox(height: ASSpacing.xl),
-
-        // 注册按钮
-        ASPrimaryButton(
-          label: '注册',
-          onPressed: _register,
-          isLoading: _isLoading,
-          isFullWidth: true,
-          height: 52,
-          animate: true,
-          animationDelay: 550.ms,
-        ),
-      ],
     );
   }
 
@@ -381,25 +409,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           ),
         ],
       ],
-    ).animate().fadeIn(duration: ASAnimations.fast);
-  }
-
-  Widget _buildLoginLink(ThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          '已有账号？',
-          style: theme.textTheme.bodyMedium,
-        ),
-        TextButton(
-          onPressed: () => context.go('/login'),
-          child: const Text('立即登录'),
-        ),
-      ],
-    )
-        .animate(delay: 600.ms)
-        .fadeIn(duration: ASAnimations.normal)
-        .slideY(begin: 0.2, end: 0);
+    );
   }
 }

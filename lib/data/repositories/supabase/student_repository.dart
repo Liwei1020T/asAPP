@@ -39,6 +39,19 @@ class SupabaseStudentRepository {
     return Student.fromJson(data as Map<String, dynamic>);
   }
 
+  /// 搜索学生（按姓名）
+  Future<List<Student>> searchStudents(String query) async {
+    final data = await supabaseClient
+        .from('students')
+        .select()
+        .ilike('full_name', '%$query%')
+        .limit(20);
+    
+    return (data as List)
+        .map((e) => Student.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<Student> createStudent(Student student) async {
     final inserted = await supabaseClient
         .from('students')

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/animations.dart';
-import '../constants/colors.dart';
 import '../constants/spacing.dart';
 import 'as_card.dart';
 
 enum ASTrendDirection { up, down, flat }
 
-/// 统计卡片：渐变背景、图标容器、趋势标记
+/// 现代化 ASP 统计卡片
 class ASStatCard extends StatelessWidget {
   const ASStatCard({
     super.key,
@@ -19,9 +19,7 @@ class ASStatCard extends StatelessWidget {
     this.gradient,
     this.trend,
     this.trendDirection = ASTrendDirection.up,
-    this.animateValue = true,
-    this.animate = true,
-    this.animationIndex,
+    this.onTap,
   });
 
   final String title;
@@ -33,20 +31,16 @@ class ASStatCard extends StatelessWidget {
   final Gradient? gradient;
   final String? trend;
   final ASTrendDirection trendDirection;
-  final bool animateValue;
-  final bool animate;
-  final int? animationIndex;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = color ?? theme.colorScheme.primary;
+    final effectiveColor = color ?? theme.colorScheme.primary;
 
-    return ASCard.gradient(
-      gradient: gradient ?? ASColors.cardGradient,
-      animate: animate,
-      animationIndex: animationIndex,
-      padding: const EdgeInsets.all(ASSpacing.cardPadding),
+    return ASCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(ASSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -55,33 +49,52 @@ class ASStatCard extends StatelessWidget {
             children: [
               if (icon != null)
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(ASSpacing.xs),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.2),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
+                    color: effectiveColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 20, color: effectiveColor),
+                ),
+              if (trend != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ASSpacing.xs,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getTrendColor(trendDirection).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getTrendIcon(trendDirection),
+                        size: 12,
+                        color: _getTrendColor(trendDirection),
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        trend!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: _getTrendColor(trendDirection),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
-                  child: Icon(
-                    icon,
-                    color: accent,
-                    size: 24,
-                  ),
-                ),
-              if (trend != null)
-                _TrendBadge(
-                  label: trend!,
-                  direction: trendDirection,
                 ),
             ],
           ),
-          const SizedBox(height: ASSpacing.lg),
-          _buildValue(theme, accent),
+          const SizedBox(height: ASSpacing.md),
+          Text(
+            valueText ?? value?.toString() ?? '--',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              height: 1.0,
+            ),
+          ).animate().fadeIn().scale(duration: ASAnimations.medium, curve: ASAnimations.emphasized),
           if (title.isNotEmpty) ...[
             const SizedBox(height: ASSpacing.xs),
             Text(
@@ -95,8 +108,8 @@ class ASStatCard extends StatelessWidget {
             const SizedBox(height: ASSpacing.xs),
             Text(
               subtitle!,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -105,90 +118,25 @@ class ASStatCard extends StatelessWidget {
     );
   }
 
-  Widget _buildValue(ThemeData theme, Color accent) {
-    final displayText = valueText ?? value?.toString() ?? '--';
-    if (value == null || !animateValue) {
-      return Text(
-        displayText,
-        style: theme.textTheme.headlineMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.onSurface,
-        ),
-      );
-    }
-
-    return TweenAnimationBuilder<double>(
-      duration: ASAnimations.medium,
-      curve: ASAnimations.smoothCurve,
-      tween: Tween<double>(begin: 0, end: value!.toDouble()),
-      builder: (context, val, _) {
-        return Text(
-          _formatValue(val, value!),
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: accent,
-          ),
-        );
-      },
-    );
-  }
-
-  String _formatValue(double animatedValue, num target) {
-    final isInt = target % 1 == 0;
-    return isInt ? animatedValue.toStringAsFixed(0) : animatedValue.toStringAsFixed(1);
-  }
-}
-
-class _TrendBadge extends StatelessWidget {
-  const _TrendBadge({
-    required this.label,
-    required this.direction,
-  });
-
-  final String label;
-  final ASTrendDirection direction;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    late Color color;
-    late IconData icon;
-
+  Color _getTrendColor(ASTrendDirection direction) {
     switch (direction) {
       case ASTrendDirection.up:
-        color = Colors.green;
-        icon = Icons.trending_up;
-        break;
+        return Colors.green;
       case ASTrendDirection.down:
-        color = theme.colorScheme.error;
-        icon = Icons.trending_down;
-        break;
+        return Colors.red;
       case ASTrendDirection.flat:
-        color = theme.colorScheme.outline;
-        icon = Icons.trending_flat;
-        break;
+        return Colors.grey;
     }
+  }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: ASSpacing.xs),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
+  IconData _getTrendIcon(ASTrendDirection direction) {
+    switch (direction) {
+      case ASTrendDirection.up:
+        return Icons.arrow_upward;
+      case ASTrendDirection.down:
+        return Icons.arrow_downward;
+      case ASTrendDirection.flat:
+        return Icons.remove;
+    }
   }
 }

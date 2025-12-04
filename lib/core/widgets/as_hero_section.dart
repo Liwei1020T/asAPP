@@ -99,7 +99,6 @@ class ASHeroSection extends StatelessWidget {
             vertical: ASSpacing.xl,
           ),
       gradient: gradient ?? ASColors.heroGradient,
-      showShadow: false,
       child: content,
     );
   }

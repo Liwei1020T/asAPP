@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
@@ -18,7 +18,7 @@ import '../../../data/repositories/supabase/hr_repository.dart';
 import '../../../data/repositories/supabase/classes_repository.dart';
 import '../../notices/presentation/notice_detail_sheet.dart';
 
-/// 教练仪表板
+/// 教练仪表板 - 现代化重构版
 class CoachDashboardPage extends ConsumerStatefulWidget {
   const CoachDashboardPage({super.key});
 
@@ -52,14 +52,13 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
           padding: const EdgeInsets.all(8.0),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.sports_tennis, size: 24),
+            child: Icon(Icons.sports_tennis, size: 24, color: theme.colorScheme.primary),
           ),
         ),
         actions: [
-          // 用户头像
           Padding(
             padding: const EdgeInsets.only(right: ASSpacing.md),
             child: ASAvatar(
@@ -68,58 +67,44 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
               size: ASAvatarSize.sm,
               showBorder: true,
               onTap: _showProfileMenu,
-              animate: true,
             ),
-          ).animate().scale(
-                delay: ASAnimations.fast,
-                duration: ASAnimations.medium,
-                curve: ASAnimations.bounceCurve,
-              ),
+          ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: ASStaggeredColumn(
+            animate: true,
             children: [
               // 公告板块
-              ASSectionTitle(
+              const ASSectionTitle(
                 title: '📢 公告 Notices',
-                animate: true,
               ),
               _buildNoticesSection(),
 
               // 操作区域
-              ASSectionTitle(
+              const ASSectionTitle(
                 title: '⚡ 操作 Actions',
-                animate: true,
-                animationDelay: 100.ms,
               ),
               _buildActionsSection(isDark),
 
               // 今日课程
-              ASSectionTitle(
+              const ASSectionTitle(
                 title: '📅 今日班级 Today\'s Classes',
-                animate: true,
-                animationDelay: 200.ms,
               ),
               _buildTodayClassesSection(),
 
               // 即将上课
-              ASSectionTitle(
+              const ASSectionTitle(
                 title: '⏭️ 即将到来的课程 Upcoming',
-                animate: true,
-                animationDelay: 250.ms,
               ),
               _buildUpcomingClassesSection(),
 
               // 统计数据
-              ASSectionTitle(
+              const ASSectionTitle(
                 title: '📊 统计 Stats',
-                animate: true,
-                animationDelay: 300.ms,
               ),
               _buildStatsSection(isDark),
 
@@ -134,9 +119,11 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
   Future<void> _refresh() async {
     // 刷新数据
     await Future.delayed(const Duration(milliseconds: 500));
+    setState(() {});
   }
 
   void _showProfileMenu() {
+    final theme = Theme.of(context);
     ASBottomSheet.show(
       context: context,
       title: '个人中心',
@@ -152,8 +139,8 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.logout, color: ASColors.error),
-            title: const Text('退出登录', style: TextStyle(color: ASColors.error)),
+            leading: Icon(Icons.logout, color: theme.colorScheme.error),
+            title: Text('退出登录', style: TextStyle(color: theme.colorScheme.error)),
             onTap: () {
               Navigator.pop(context);
               ref.read(supabaseAuthRepositoryProvider).signOut();
@@ -209,9 +196,8 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
               final notice = notices[index];
               return _NoticeCard(
                 notice: notice,
-                animationIndex: index,
                 onTap: () => NoticeDetailSheet.show(context, notice),
-              );
+              ).animate(delay: (index * 50).ms).fadeIn().slideX();
             },
           ),
         );
@@ -285,6 +271,9 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
 
   /// 操作区块
   Widget _buildActionsSection(bool isDark) {
+    final theme = Theme.of(context);
+    final secondaryColor = theme.colorScheme.onSurfaceVariant;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding),
       child: Row(
@@ -292,8 +281,6 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
           // 提示卡片：打卡已迁移到课程点名页面
           Expanded(
             child: ASCard(
-              animate: true,
-              animationIndex: 0,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -301,7 +288,7 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                     children: [
                       Icon(
                         Icons.info_outline,
-                        color: isDark ? ASColorsDark.textSecondary : ASColors.textSecondary,
+                        color: secondaryColor,
                       ),
                       const SizedBox(width: ASSpacing.sm),
                       const Text(
@@ -316,7 +303,7 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                   const SizedBox(height: ASSpacing.sm),
                   Text(
                     '请在每节课的点名页面自动打卡，薪资将按课程统计。',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: theme.textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -326,8 +313,6 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
           if (_todayShifts.isNotEmpty)
             Expanded(
               child: ASCard(
-                animate: true,
-                animationIndex: 1,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -346,7 +331,7 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                               Expanded(
                                 child: Text(
                                   '${s.startTime}-${s.endTime.isNotEmpty ? s.endTime : '--'} ${s.className ?? ''}',
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                  style: theme.textTheme.bodySmall,
                                 ),
                               ),
                             ],
@@ -515,7 +500,6 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
   /// 今日课程区块
   Widget _buildTodayClassesSection() {
     final currentUser = ref.watch(currentUserProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return FutureBuilder<List<Session>>(
       future: _fetchTodaySessions(currentUser?.id ?? ''),
@@ -555,12 +539,11 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
               padding: const EdgeInsets.only(bottom: ASSpacing.md),
               child: _SessionCard(
                 session: entry.value,
-                animationIndex: entry.key,
                 onEnterAttendance: () async {
                   await context.push('/attendance/${entry.value.id}');
                   if (mounted) setState(() {});
                 },
-              ),
+              ).animate(delay: (entry.key * 50).ms).fadeIn().slideY(begin: 0.1, end: 0),
             )).toList(),
           ),
         );
@@ -612,12 +595,11 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                 padding: const EdgeInsets.only(bottom: ASSpacing.md),
                 child: _SessionCard(
                   session: session,
-                  animationIndex: entry.key,
                   onEnterAttendance: () async {
                     await context.push('/attendance/${session.id}');
                     if (mounted) setState(() {});
                   },
-                ),
+                ).animate(delay: (entry.key * 50).ms).fadeIn().slideY(begin: 0.1, end: 0),
               );
             }).toList(),
           ),
@@ -629,8 +611,9 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
   /// 统计区块
   Widget _buildStatsSection(bool isDark) {
     final currentUser = ref.watch(currentUserProvider);
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
-    final hintColor = isDark ? ASColorsDark.textHint : ASColors.textHint;
+    final theme = Theme.of(context);
+    final secondaryColor = theme.colorScheme.onSurfaceVariant;
+    final hintColor = theme.hintColor;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: ASSpacing.pagePadding),
@@ -649,7 +632,6 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                       value: snapshot.data ?? 0,
                       icon: Icons.schedule,
                       color: ASColors.primary,
-                      animationIndex: 0,
                     );
                   },
                 ),
@@ -671,8 +653,6 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
                       valueText: 'RM ${summary?.totalSalary.toStringAsFixed(0) ?? '0'}',
                       icon: Icons.account_balance_wallet,
                       color: ASColors.success,
-                      animateValue: false,
-                      animationIndex: 1,
                       trend: summary == null ? '计算中' : '',
                     );
                   },
@@ -683,8 +663,6 @@ class _CoachDashboardPageState extends ConsumerState<CoachDashboardPage> {
           const SizedBox(height: ASSpacing.md),
           // 查看详细薪资按钮
           ASCard(
-            animate: true,
-            animationIndex: 2,
             onTap: () => context.push('/salary'),
             child: Row(
               children: [
@@ -735,21 +713,19 @@ class _NoticeCard extends StatelessWidget {
   const _NoticeCard({
     required this.notice, 
     required this.onTap,
-    this.animationIndex = 0,
   });
 
   final Notice notice;
   final VoidCallback onTap;
-  final int animationIndex;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Container(
       width: 260,
       margin: const EdgeInsets.only(right: ASSpacing.md),
       child: ASCard(
-        animate: true,
-        animationIndex: animationIndex,
         onTap: onTap,
         borderColor: notice.isUrgent ? ASColors.error : null,
         borderWidth: notice.isUrgent ? 2 : 0,
@@ -777,7 +753,7 @@ class _NoticeCard extends StatelessWidget {
             Expanded(
               child: Text(
                 notice.content,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: theme.textTheme.bodySmall,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -785,7 +761,7 @@ class _NoticeCard extends StatelessWidget {
             const SizedBox(height: ASSpacing.sm),
             Text(
               DateFormatters.relativeTime(notice.createdAt),
-              style: Theme.of(context).textTheme.labelSmall,
+              style: theme.textTheme.labelSmall,
             ),
           ],
         ),
@@ -798,22 +774,18 @@ class _NoticeCard extends StatelessWidget {
 class _SessionCard extends ConsumerWidget {
   const _SessionCard({
     required this.session,
-    this.animationIndex = 0,
     this.onEnterAttendance,
   });
 
   final Session session;
-  final int animationIndex;
   final Future<void> Function()? onEnterAttendance;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor = isDark ? ASColorsDark.textSecondary : ASColors.textSecondary;
+    final theme = Theme.of(context);
+    final secondaryColor = theme.colorScheme.onSurfaceVariant;
     
     return ASCard(
-      animate: true,
-      animationIndex: animationIndex,
       child: Row(
         children: [
           // 左侧时间标识
@@ -847,14 +819,14 @@ class _SessionCard extends ConsumerWidget {
                     const SizedBox(width: 4),
                     Text(
                       DateFormatters.date(session.startTime),
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(width: ASSpacing.md),
                     Icon(Icons.access_time, size: 14, color: secondaryColor),
                     const SizedBox(width: 4),
                     Text(
                       DateFormatters.timeRange(session.startTime, session.endTime),
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(width: ASSpacing.md),
                     Icon(Icons.location_on, size: 14, color: secondaryColor),
@@ -862,7 +834,7 @@ class _SessionCard extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         session.venue ?? '',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: theme.textTheme.bodySmall,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),

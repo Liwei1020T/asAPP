@@ -3,8 +3,11 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/widgets/widgets.dart';
@@ -57,13 +60,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('个人资料'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: profile == null
           ? const Center(child: ASSkeletonProfileCard())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(ASSpacing.pagePadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: ASStaggeredColumn(
                 children: [
                   ASSectionTitle(
                     title: '账户信息',
@@ -80,6 +86,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   ),
                   const SizedBox(height: ASSpacing.md),
                   _buildSecurityCard(),
+                  const SizedBox(height: ASSpacing.xxl),
+                  ASPrimaryButton(
+                    label: '退出登录',
+                    icon: Icons.logout,
+                    onPressed: _logout,
+                    backgroundColor: ASColors.error,
+                    foregroundColor: Colors.white,
+                    isFullWidth: true,
+                    height: 50,
+                  ),
+                  const SizedBox(height: ASSpacing.xxl),
                 ],
               ),
             ),
@@ -87,19 +104,55 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Widget _buildProfileCard(Profile profile, String email) {
-    return ASCard.gradient(
-      padding: const EdgeInsets.all(ASSpacing.cardPadding),
-      gradient: ASColors.cardGradient,
+    final theme = Theme.of(context);
+    
+    return ASCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              ASAvatar(
-                imageUrl: _avatarUrl,
-                name: profile.fullName,
-                size: ASAvatarSize.xl,
-                showBorder: true,
+              Stack(
+                children: [
+                  ASAvatar(
+                    imageUrl: _avatarUrl,
+                    name: profile.fullName,
+                    size: ASAvatarSize.xl,
+                    showBorder: true,
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    foregroundColor: theme.colorScheme.onPrimaryContainer,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: InkWell(
+                      onTap: _uploadingAvatar ? null : _pickAvatar,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: theme.colorScheme.surface, width: 2),
+                        ),
+                        child: _uploadingAvatar
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.camera_alt,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: ASSpacing.lg),
               Expanded(
@@ -108,16 +161,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   children: [
                     Text(
                       profile.fullName,
-                      style: const TextStyle(
-                        fontSize: 20,
+                      style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: ASSpacing.xs),
                     Text(
                       email,
-                      style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: ASSpacing.sm),
@@ -126,7 +178,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       runSpacing: ASSpacing.sm,
                       children: [
                         ASTag(
-                          label: profile.role.name,
+                          label: _getRoleName(profile.role),
                           type: ASTagType.primary,
                         ),
                         if (profile.phoneNumber != null)
@@ -139,21 +191,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   ],
                 ),
               ),
-              const SizedBox(width: ASSpacing.lg),
-              OutlinedButton.icon(
-                onPressed: _uploadingAvatar ? null : _pickAvatar,
-                icon: _uploadingAvatar
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.camera_alt_outlined),
-                label: Text(_uploadingAvatar ? '上传中...' : '更换头像'),
-              ),
             ],
           ),
-          const Divider(height: ASSpacing.xl),
+          const SizedBox(height: ASSpacing.xl),
+          const Divider(),
+          const SizedBox(height: ASSpacing.lg),
           ASTextField(
             controller: _nameController,
             label: '姓名',
@@ -175,7 +217,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               label: '保存资料',
               isLoading: _savingProfile,
               onPressed: _savingProfile ? null : () => _saveProfile(profile),
-              height: 44,
             ),
           ),
         ],
@@ -185,15 +226,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   Widget _buildSecurityCard() {
     return ASCard(
-      padding: const EdgeInsets.all(ASSpacing.cardPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '修改密码',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: ASSpacing.md),
           ASTextField(
             controller: _newPasswordController,
             label: '新密码',
@@ -216,7 +251,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               label: '更新密码',
               isLoading: _updatingPassword,
               onPressed: _updatingPassword ? null : _updatePassword,
-              height: 44,
               backgroundColor: Theme.of(context).colorScheme.secondary,
               foregroundColor: Theme.of(context).colorScheme.onSecondary,
             ),
@@ -224,6 +258,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ],
       ),
     );
+  }
+
+  String _getRoleName(UserRole role) {
+    switch (role) {
+      case UserRole.admin:
+        return '管理员';
+      case UserRole.coach:
+        return '教练';
+      case UserRole.parent:
+        return '家长';
+      case UserRole.student:
+        return '学员';
+    }
   }
 
   Future<void> _saveProfile(Profile profile) async {
@@ -349,6 +396,33 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       }
     } finally {
       if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('退出登录'),
+        content: const Text('确定要退出登录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('退出', style: TextStyle(color: ASColors.error)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await ref.read(supabaseAuthRepositoryProvider).signOut();
+      if (mounted) {
+        context.go('/login');
+      }
     }
   }
 }

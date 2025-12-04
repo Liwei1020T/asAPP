@@ -2,12 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lottie/lottie.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/constants/animations.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/widgets/widgets.dart';
@@ -184,10 +181,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
           SizedBox(
             width: 140,
             height: 140,
-            child: Lottie.asset(
-              'assets/animations/loading_dots.json',
-              repeat: true,
-            ),
+            child: Icon(Icons.mark_email_unread_outlined, size: 100, color: primaryColor),
           ),
           const SizedBox(height: ASSpacing.md),
           Text(
@@ -272,9 +266,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
               style: theme.textTheme.bodySmall,
             ),
           ],
-        )
-            .animate(delay: 350.ms)
-            .fadeIn(duration: ASAnimations.normal),
+        ),
       ],
     );
   }
@@ -323,7 +315,6 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
           isFullWidth: true,
           height: 52,
           animate: true,
-          animationDelay: 400.ms,
         ),
         const SizedBox(height: ASSpacing.md),
         TextButton(
@@ -338,9 +329,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
               color: theme.colorScheme.primary,
             ),
           ),
-        )
-            .animate(delay: 450.ms)
-            .fadeIn(duration: ASAnimations.normal),
+        ),
         const SizedBox(height: ASSpacing.sm),
         Text(
           '没有收到邮件？请检查垃圾邮件文件夹',
@@ -348,9 +337,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
             color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
           ),
           textAlign: TextAlign.center,
-        )
-            .animate(delay: 500.ms)
-            .fadeIn(duration: ASAnimations.normal),
+        ),
       ],
     );
   }

@@ -1,242 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
-/// ASP-MS 动画常量
+/// ASP-MS 动画系统常量
+/// 
+/// 统一管理应用内的动画时长、曲线和常用效果，确保视觉体验的一致性。
 class ASAnimations {
   ASAnimations._();
 
-  // ============ 动画时长 ============
+  // ============ 时长 (Durations) ============
   
-  /// 极快动画 - 用于即时反馈（涟漪、高亮）
-  static const Duration instant = Duration(milliseconds: 50);
+  /// 极短动画 (50ms) - 用于微交互，如按钮按压
+  static const Duration short = Duration(milliseconds: 50);
   
-  /// 快速动画 - 用于微交互（按钮点击、hover等）
+  /// 短动画 (150ms) - 用于简单的状态变化，如复选框切换
   static const Duration fast = Duration(milliseconds: 150);
   
-  /// 正常动画 - 用于一般过渡
-  static const Duration normal = Duration(milliseconds: 300);
+  /// 标准动画 (300ms) - 用于大多数 UI 元素的入场、页面切换
+  static const Duration medium = Duration(milliseconds: 300);
   
-  /// 中等动画 - 用于页面元素入场
-  static const Duration medium = Duration(milliseconds: 400);
+  /// 长动画 (500ms) - 用于复杂的强调动画或大面积内容变化
+  static const Duration long = Duration(milliseconds: 500);
   
-  /// 慢速动画 - 用于复杂过渡或强调效果
-  static const Duration slow = Duration(milliseconds: 500);
-  
-  /// 超慢动画 - 用于大型动画效果
-  static const Duration slower = Duration(milliseconds: 700);
-  
-  /// 页面过渡动画
-  static const Duration pageTransition = Duration(milliseconds: 350);
-  
-  /// 模态弹窗动画
-  static const Duration modal = Duration(milliseconds: 250);
+  /// 极长动画 (800ms) - 用于加载状态或背景流动
+  static const Duration extraLong = Duration(milliseconds: 800);
 
-  // ============ 动画曲线 ============
+  // ============ 曲线 (Curves) ============
   
-  /// 默认缓动曲线 - 平滑自然
-  static const Curve defaultCurve = Curves.easeOutCubic;
+  /// 标准曲线 - 用于大多数自然运动
+  static const Curve standard = Curves.easeOutCubic;
   
-  /// 弹性曲线 - 带轻微回弹
-  static const Curve bounceCurve = Curves.elasticOut;
+  /// 强调曲线 - 用于弹窗、重要元素的入场，带有轻微的弹性
+  static const Curve emphasized = Curves.easeOutBack;
   
-  /// 弹簧曲线 - 更自然的弹性效果
-  static const Curve springCurve = Curves.easeOutBack;
+  /// 减速曲线 - 用于退出动画
+  static const Curve decelerate = Curves.decelerate;
   
-  /// 平滑曲线 - 用于渐变和淡入淡出
-  static const Curve smoothCurve = Curves.easeInOutCubic;
-  
-  /// 减速曲线 - 快进慢出
-  static const Curve decelerateCurve = Curves.decelerate;
-  
-  /// 加速曲线 - 慢进快出
-  static const Curve accelerateCurve = Curves.easeIn;
-  
-  /// 强调曲线 - 用于强调动画
-  static const Curve emphasizeCurve = Curves.easeOutBack;
-  
-  /// 进入曲线
-  static const Curve enterCurve = Curves.easeOutCubic;
-  
-  /// 退出曲线
-  static const Curve exitCurve = Curves.easeInCubic;
-  
-  /// 页面进入曲线
-  static const Curve pageEnterCurve = Curves.easeOutCubic;
-  
-  /// 页面退出曲线
-  static const Curve pageExitCurve = Curves.easeInCubic;
-  
-  /// 弹窗曲线
-  static const Curve dialogCurve = Curves.easeOutBack;
+  /// 线性 - 用于旋转加载等
+  static const Curve linear = Curves.linear;
 
-  // ============ 微交互参数 ============
-  
-  /// 悬停缩放
-  static const double hoverScale = 1.02;
-  
-  /// 按下缩放
-  static const double tapScale = 0.96;
-  
-  /// 按钮按下缩放
-  static const double buttonPressScale = 0.97;
-  
-  /// 卡片按下缩放
-  static const double cardPressScale = 0.98;
-  
-  /// 拖拽时缩放
-  static const double dragScale = 1.05;
-  
-  /// 悬停高程增量
-  static const double hoverElevation = 4.0;
-  
-  /// 按下高程减量
-  static const double pressedElevation = 1.0;
-
-  // ============ 列表动画延迟 ============
+  // ============ 常用效果配置 (Effect Configs) ============
   
   /// 列表项交错延迟
-  static const Duration staggerDelay = Duration(milliseconds: 50);
+  static const Duration staggerInterval = Duration(milliseconds: 50);
   
-  /// 快速交错延迟
-  static const Duration staggerDelayFast = Duration(milliseconds: 30);
-  
-  /// 慢速交错延迟
-  static const Duration staggerDelaySlow = Duration(milliseconds: 80);
-  
-  /// 最大交错延迟（防止列表过长时延迟过大）
-  static const Duration maxStaggerDelay = Duration(milliseconds: 500);
-
-  // ============ 动画偏移量 ============
-  
-  /// 垂直滑入偏移
-  static const double slideOffsetY = 20.0;
-  
-  /// 水平滑入偏移
-  static const double slideOffsetX = 20.0;
-  
-  /// 页面滑入偏移
-  static const double pageSlideOffset = 30.0;
-  
-  /// 缩放起始值
-  static const double scaleStart = 0.95;
-  
-  /// 淡入起始透明度
-  static const double fadeStart = 0.0;
-
-  // ============ 辅助方法 ============
-  
-  /// 计算列表项的交错延迟
-  static Duration getStaggerDelay(int index, {int maxItems = 10}) {
-    final clampedIndex = index.clamp(0, maxItems);
-    return Duration(
-      milliseconds: staggerDelay.inMilliseconds * clampedIndex,
-    );
-  }
-  
-  /// 计算快速交错延迟
-  static Duration getStaggerDelayFast(int index, {int maxItems = 15}) {
-    final clampedIndex = index.clamp(0, maxItems);
-    return Duration(
-      milliseconds: staggerDelayFast.inMilliseconds * clampedIndex,
-    );
-  }
+  /// 页面转场配置
+  static const Duration pageTransitionDuration = Duration(milliseconds: 400);
+  static const Curve pageTransitionCurve = Curves.easeOutQuart;
 }
 
-/// 页面转场动画构建器
-class ASPageTransition {
-  ASPageTransition._();
-  
-  /// 淡入 + 向上滑入
-  static Widget fadeSlideUp({
-    required Widget child,
-    required Animation<double> animation,
-    required Animation<double> secondaryAnimation,
+/// 动画扩展方法
+extension ASAnimateExtensions on Widget {
+  /// 标准入场动画：淡入 + 向上轻微位移
+  /// 
+  /// 适用于列表项、卡片等内容块的入场
+  Widget asFadeSlide({
+    Duration? delay,
+    Duration duration = ASAnimations.medium,
+    Offset begin = const Offset(0, 10), // 10px 向上位移
   }) {
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: ASAnimations.enterCurve,
-      ),
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.1),
+    return animate(delay: delay)
+        .fadeIn(duration: duration, curve: ASAnimations.standard)
+        .slide(
+          begin: Offset(0, 0.1), // 相对高度的 10%
           end: Offset.zero,
-        ).animate(CurvedAnimation(
-          parent: animation,
-          curve: ASAnimations.enterCurve,
-        )),
-        child: child,
-      ),
-    );
+          duration: duration,
+          curve: ASAnimations.standard,
+        );
   }
-  
-  /// 淡入 + 缩放
-  static Widget fadeScale({
-    required Widget child,
-    required Animation<double> animation,
-    required Animation<double> secondaryAnimation,
+
+  /// 强调入场动画：淡入 + 缩放
+  /// 
+  /// 适用于弹窗、重要图标、头像等
+  Widget asScaleIn({
+    Duration? delay,
+    Duration duration = ASAnimations.medium,
+    double begin = 0.9,
   }) {
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: ASAnimations.enterCurve,
-      ),
-      child: ScaleTransition(
-        scale: Tween<double>(
-          begin: ASAnimations.scaleStart,
-          end: 1.0,
-        ).animate(CurvedAnimation(
-          parent: animation,
-          curve: ASAnimations.springCurve,
-        )),
-        child: child,
-      ),
-    );
+    return animate(delay: delay)
+        .fadeIn(duration: duration, curve: ASAnimations.standard)
+        .scale(
+          begin: Offset(begin, begin),
+          end: const Offset(1, 1),
+          duration: duration,
+          curve: ASAnimations.emphasized,
+        );
   }
-  
-  /// 共享轴转场 (水平)
-  static Widget sharedAxisHorizontal({
-    required Widget child,
-    required Animation<double> animation,
-    required Animation<double> secondaryAnimation,
-  }) {
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
-      ),
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0.3, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(
-          parent: animation,
-          curve: ASAnimations.enterCurve,
-        )),
-        child: child,
-      ),
-    );
-  }
-  
-  /// 模态弹窗动画
-  static Widget modalTransition({
-    required Widget child,
-    required Animation<double> animation,
-  }) {
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: ASAnimations.smoothCurve,
-      ),
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.15),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(
-          parent: animation,
-          curve: ASAnimations.dialogCurve,
-        )),
-        child: child,
-      ),
-    );
-  }
+
+  /// 悬停缩放效果 (需要配合 MouseRegion 或 InkWell 使用，这里仅提供动画定义)
+  /// 注意：flutter_animate 的 toggle 需要状态控制，这里仅作为静态定义参考
 }

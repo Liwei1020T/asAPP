@@ -10,11 +10,12 @@ enum ASCardVariant {
   basic,
   gradient,
   glass,
+  outline,
 }
 
-/// ASP 风格卡片组件
+/// ASP 现代化卡片组件
 /// 
-/// 支持入场动画和悬停效果
+/// 支持悬停、点击、玻璃拟态和入场动画。
 class ASCard extends StatefulWidget {
   const ASCard({
     super.key,
@@ -23,20 +24,19 @@ class ASCard extends StatefulWidget {
     this.margin,
     this.onTap,
     this.borderColor,
-    this.borderWidth = 0,
-    this.elevation = 2,
+    this.borderWidth = 1,
+    this.elevation = 0,
     this.variant = ASCardVariant.basic,
     this.gradient,
     this.backgroundColor,
-    this.glassBlurSigma = ASColors.glassBlurSigma,
-    this.glassOpacity = 0.85,
-    this.showShadow = true,
+    this.glassBlurSigma = 10,
+    this.glassOpacity = 0.1,
+    this.borderRadius,
     this.animate = false,
     this.animationDelay,
     this.animationIndex,
   });
 
-  /// 渐变卡片便捷构造
   const ASCard.gradient({
     super.key,
     required this.child,
@@ -45,19 +45,17 @@ class ASCard extends StatefulWidget {
     this.onTap,
     this.borderColor,
     this.borderWidth = 0,
-    this.elevation = 2,
-    Gradient? gradient,
+    this.elevation = 0,
+    required Gradient this.gradient,
     this.backgroundColor,
-    this.glassBlurSigma = ASColors.glassBlurSigma,
-    this.glassOpacity = 0.9,
-    this.showShadow = true,
+    this.glassBlurSigma = 0,
+    this.glassOpacity = 1,
+    this.borderRadius,
     this.animate = false,
     this.animationDelay,
     this.animationIndex,
-  })  : variant = ASCardVariant.gradient,
-        gradient = gradient ?? ASColors.cardGradient;
+  }) : variant = ASCardVariant.gradient;
 
-  /// 玻璃态卡片便捷构造
   const ASCard.glass({
     super.key,
     required this.child,
@@ -65,13 +63,13 @@ class ASCard extends StatefulWidget {
     this.margin,
     this.onTap,
     this.borderColor,
-    this.borderWidth = 1,
+    this.borderWidth = 0,
     this.elevation = 0,
     this.gradient,
     this.backgroundColor,
-    this.glassBlurSigma = ASColors.glassBlurSigmaLight,
-    this.glassOpacity = 0.7,
-    this.showShadow = false,
+    this.glassBlurSigma = 10,
+    this.glassOpacity = 0.1,
+    this.borderRadius,
     this.animate = false,
     this.animationDelay,
     this.animationIndex,
@@ -89,15 +87,13 @@ class ASCard extends StatefulWidget {
   final Color? backgroundColor;
   final double glassBlurSigma;
   final double glassOpacity;
-  final bool showShadow;
+  final BorderRadius? borderRadius;
   
   /// 是否启用入场动画
   final bool animate;
-  
-  /// 自定义动画延迟
+  /// 动画延迟
   final Duration? animationDelay;
-  
-  /// 列表中的索引，用于计算交错动画延迟
+  /// 列表索引（自动计算交错延迟）
   final int? animationIndex;
 
   @override
@@ -113,87 +109,99 @@ class _ASCardState extends State<ASCard> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    final cardColor = widget.backgroundColor ?? 
-        theme.cardTheme.color ?? 
-        theme.colorScheme.surface;
-    final shadowColor = isDark 
-        ? Colors.black.withValues(alpha: 0.4)
-        : Colors.black.withValues(alpha: 0.1);
+    final radius = widget.borderRadius ?? BorderRadius.circular(ASSpacing.cardRadius);
+    
+    // 计算背景色
+    Color? bgColor = widget.backgroundColor;
+    if (bgColor == null) {
+      switch (widget.variant) {
+        case ASCardVariant.basic:
+          bgColor = theme.cardTheme.color;
+          break;
+        case ASCardVariant.glass:
+          bgColor = (isDark ? Colors.black : Colors.white).withValues(alpha: widget.glassOpacity);
+          break;
+        case ASCardVariant.outline:
+          bgColor = Colors.transparent;
+          break;
+        case ASCardVariant.gradient:
+          bgColor = null; // 使用 gradient
+          break;
+      }
+    }
 
-    // 计算当前高度
-    final currentElevation = _isPressed
-        ? widget.elevation * 0.5
-        : _isHovered
-            ? widget.elevation * 1.5
-            : widget.elevation;
-
-    final scaleValue = _isPressed ? ASAnimations.buttonPressScale : 1.0;
-
-    final borderRadius = BorderRadius.circular(ASSpacing.cardRadius);
-    final effectiveGradient = widget.gradient ??
-        (widget.variant == ASCardVariant.gradient
-            ? ASColors.cardGradient
-            : null);
-    final effectiveBorderColor = widget.borderColor ??
-        (widget.variant == ASCardVariant.glass
-            ? (isDark ? ASColorsDark.glassBorder : ASColors.glassBorderLight)
-            : null);
-
-    Widget card = AnimatedContainer(
-      duration: ASAnimations.fast,
-      curve: ASAnimations.defaultCurve,
-      transform: Matrix4.identity()
-        ..setEntry(0, 0, scaleValue)
-        ..setEntry(1, 1, scaleValue),
-      transformAlignment: Alignment.center,
+    // 构建基础容器
+    Widget content = Container(
+      padding: widget.padding ?? const EdgeInsets.all(ASSpacing.lg),
       decoration: BoxDecoration(
-        color: widget.variant == ASCardVariant.glass
-            ? (cardColor.withValues(alpha: widget.glassOpacity))
-            : cardColor,
-        gradient: effectiveGradient,
-        borderRadius: borderRadius,
-        border: effectiveBorderColor != null && widget.borderWidth > 0
-            ? Border.all(color: effectiveBorderColor, width: widget.borderWidth)
+        color: bgColor,
+        gradient: widget.gradient,
+        borderRadius: radius,
+        border: widget.variant == ASCardVariant.outline || widget.borderColor != null
+            ? Border.all(
+                color: widget.borderColor ?? theme.dividerColor,
+                width: widget.borderWidth,
+              )
             : null,
-        boxShadow: widget.showShadow
+        boxShadow: _isHovered && widget.onTap != null
             ? [
                 BoxShadow(
-                  color: shadowColor,
-                  blurRadius: currentElevation * 2,
-                  offset: Offset(0, currentElevation),
-                ),
+                  color: theme.shadowColor.withValues(alpha: 0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                )
               ]
-            : null,
+            : (widget.elevation > 0
+                ? [
+                    BoxShadow(
+                      color: theme.shadowColor.withValues(alpha: 0.05),
+                      blurRadius: widget.elevation * 4,
+                      offset: Offset(0, widget.elevation * 2),
+                    )
+                  ]
+                : null),
       ),
-      padding: widget.padding ?? const EdgeInsets.all(ASSpacing.cardPadding),
-      margin: widget.margin,
       child: widget.child,
     );
 
+    // 应用玻璃拟态
     if (widget.variant == ASCardVariant.glass) {
-      card = ClipRRect(
-        borderRadius: borderRadius,
+      content = ClipRRect(
+        borderRadius: radius,
         child: BackdropFilter(
           filter: ImageFilter.blur(
             sigmaX: widget.glassBlurSigma,
             sigmaY: widget.glassBlurSigma,
           ),
-          child: card,
+          child: content,
         ),
       );
     }
 
+    // 应用交互效果 (Scale + Hover)
     if (widget.onTap != null) {
-      card = MouseRegion(
+      content = MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
         child: GestureDetector(
           onTapDown: (_) => setState(() => _isPressed = true),
           onTapUp: (_) => setState(() => _isPressed = false),
           onTapCancel: () => setState(() => _isPressed = false),
           onTap: widget.onTap,
-          child: card,
+          child: AnimatedScale(
+            scale: _isPressed ? 0.98 : (_isHovered ? 1.01 : 1.0),
+            duration: ASAnimations.short,
+            curve: Curves.easeInOut,
+            child: content,
+          ),
         ),
+      );
+    } else {
+      // 即使不可点击，也可以有 margin
+      content = Padding(
+        padding: widget.margin ?? EdgeInsets.zero,
+        child: content,
       );
     }
 
@@ -201,23 +209,22 @@ class _ASCardState extends State<ASCard> {
     if (widget.animate) {
       final delay = widget.animationDelay ?? 
           (widget.animationIndex != null 
-              ? ASAnimations.getStaggerDelay(widget.animationIndex!)
+              ? ASAnimations.staggerInterval * widget.animationIndex! 
               : Duration.zero);
-      
-      return card
-          .animate(delay: delay)
-          .fadeIn(
-            duration: ASAnimations.normal,
-            curve: ASAnimations.defaultCurve,
-          )
-          .slideY(
-            begin: 0.1,
-            end: 0,
-            duration: ASAnimations.normal,
-            curve: ASAnimations.defaultCurve,
-          );
+              
+      content = content.animate(delay: delay)
+          .fadeIn(duration: ASAnimations.medium, curve: ASAnimations.standard)
+          .slideY(begin: 0.1, end: 0, duration: ASAnimations.medium, curve: ASAnimations.standard);
     }
 
-    return card;
+    // 如果有 margin 且可点击，margin 需要在 InkWell/GestureDetector 外部
+    if (widget.onTap != null && widget.margin != null) {
+      content = Padding(
+        padding: widget.margin!,
+        child: content,
+      );
+    }
+
+    return content;
   }
 }

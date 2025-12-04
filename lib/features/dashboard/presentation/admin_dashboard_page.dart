@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/animations.dart';
 import '../../../core/constants/spacing.dart';
@@ -13,8 +13,9 @@ import '../../../data/models/notice.dart';
 import '../../../core/utils/date_formatters.dart';
 import '../../../data/repositories/supabase/supabase_client_provider.dart';
 import '../../../data/models/profile.dart';
+import 'widgets/dashboard_widgets.dart';
 
-/// 管理员仪表板
+/// 管理员仪表板 - 现代化重构版
 class AdminDashboardPage extends ConsumerWidget {
   const AdminDashboardPage({super.key});
 
@@ -42,46 +43,9 @@ class AdminDashboardPage extends ConsumerWidget {
       ),
       body: SingleChildScrollView(
         padding: padding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ASHeroSection(
-              title: '欢迎回来，${currentUser?.fullName ?? 'Admin'}',
-              subtitle: '这里是您的学院概览',
-              avatar: ASAvatar(
-                name: currentUser?.fullName ?? 'Admin',
-                size: ASAvatarSize.lg,
-                showBorder: true,
-                backgroundColor: theme.colorScheme.primaryContainer,
-                foregroundColor: theme.colorScheme.onPrimaryContainer,
-                animate: true,
-              ),
-              actions: [
-                FilledButton.icon(
-                  onPressed: () => context.push('/students'),
-                  icon: const Icon(Icons.add),
-                  label: const Text('添加学员'),
-                ),
-              ],
-            ),
-
-            // 统计概览 - 带交错动画
-            _buildStatsOverview(context, ref),
-
-            const SizedBox(height: ASSpacing.xl),
-
-            // 最近活动（实时读取 Supabase）
-            Text(
-              '最近活动',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            )
-                .animate(delay: 400.ms)
-                .fadeIn(duration: ASAnimations.normal),
-            const SizedBox(height: ASSpacing.md),
-            _buildRecentActivity(context, ref),
-          ],
+        child: ASResponsiveBuilder(
+          mobile: _buildMobileLayout(context, ref),
+          desktop: _buildDesktopLayout(context, ref),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -89,14 +53,143 @@ class AdminDashboardPage extends ConsumerWidget {
         icon: const Icon(Icons.add),
         label: const Text('添加学员'),
         backgroundColor: theme.colorScheme.primary,
-      )
-          .animate(delay: 600.ms)
-          .scale(
-            begin: const Offset(0, 0),
-            end: const Offset(1, 1),
-            duration: ASAnimations.medium,
-            curve: ASAnimations.emphasizeCurve,
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context, WidgetRef ref) {
+    return ASStaggeredColumn(
+      animate: true,
+      children: [
+        _buildHero(context, ref),
+        _buildStatsOverview(context, ref, isMobile: true),
+        const SizedBox(height: ASSpacing.md),
+        const QuickActions(),
+        const SizedBox(height: ASSpacing.md),
+        _buildChartSection(context),
+        const SizedBox(height: ASSpacing.md),
+        _buildRecentActivitySection(context, ref),
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHero(context, ref),
+        const SizedBox(height: ASSpacing.lg),
+        
+        // Row 1: KPI Cards
+        _buildStatsOverview(context, ref, isMobile: false),
+        const SizedBox(height: ASSpacing.lg),
+
+        // Row 2: Chart + Quick Actions
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: _buildChartSection(context),
+            ),
+            const SizedBox(width: ASSpacing.lg),
+            const Expanded(
+              flex: 1,
+              child: QuickActions(),
+            ),
+          ],
+        ),
+        const SizedBox(height: ASSpacing.lg),
+
+        // Row 3: Recent Activity + Upcoming (Placeholder for now)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: _buildRecentActivitySection(context, ref),
+            ),
+            const SizedBox(width: ASSpacing.lg),
+            Expanded(
+              flex: 1,
+              child: ASCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '即将开始的课程',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: ASSpacing.md),
+                    const ASEmptyState(
+                      type: ASEmptyStateType.noData, 
+                      title: '暂无课程',
+                      description: '今天没有安排课程',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHero(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(currentUserProvider);
+    final theme = Theme.of(context);
+    return ASHeroSection(
+      title: '欢迎回来，${currentUser?.fullName ?? 'Admin'}',
+      subtitle: '这里是您的学院概览',
+      avatar: ASAvatar(
+        name: currentUser?.fullName ?? 'Admin',
+        size: ASAvatarSize.lg,
+        showBorder: true,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        foregroundColor: theme.colorScheme.onPrimaryContainer,
+      ),
+      actions: [
+        FilledButton.icon(
+          onPressed: () => context.push('/students'),
+          icon: const Icon(Icons.add),
+          label: const Text('添加学员'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChartSection(BuildContext context) {
+    return FutureBuilder<List<double>>(
+      future: _loadWeeklyAttendanceTrend(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const ASSkeletonCard(height: 240);
+        }
+
+        return SimpleLineChart(
+          title: '本周学员出勤趋势',
+          data: snapshot.data!,
+          height: 240,
+        );
+      },
+    );
+  }
+
+  Widget _buildRecentActivitySection(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '最近活动',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
           ),
+        ),
+        const SizedBox(height: ASSpacing.md),
+        _buildRecentActivityList(context, ref),
+      ],
     );
   }
 
@@ -132,7 +225,7 @@ class AdminDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsOverview(BuildContext context, WidgetRef ref) {
+  Widget _buildStatsOverview(BuildContext context, WidgetRef ref, {required bool isMobile}) {
     final theme = Theme.of(context);
     final future = Future.wait<_CountTrend>([
       _loadClassStat(),
@@ -140,28 +233,21 @@ class AdminDashboardPage extends ConsumerWidget {
       _loadProfileStat(UserRole.coach),
     ]);
 
-    final skeleton = ASResponsiveBuilder(
-      mobile: Column(
-        children: List.generate(
-          3,
-          (i) => Padding(
-            padding: EdgeInsets.only(bottom: i < 2 ? ASSpacing.md : 0),
+    final skeleton = isMobile 
+      ? Column(
+          children: List.generate(3, (i) => Padding(
+            padding: const EdgeInsets.only(bottom: ASSpacing.md),
             child: const ASSkeletonStatCard(),
-          ),
-        ),
-      ),
-      tablet: Row(
-        children: List.generate(
-          3,
-          (i) => Expanded(
+          )),
+        )
+      : Row(
+          children: List.generate(3, (i) => Expanded(
             child: Padding(
               padding: EdgeInsets.only(left: i > 0 ? ASSpacing.md : 0),
               child: const ASSkeletonStatCard(),
             ),
-          ),
-        ),
-      ),
-    );
+          )),
+        );
 
     return FutureBuilder<List<_CountTrend>>(
       future: future,
@@ -188,7 +274,6 @@ class AdminDashboardPage extends ConsumerWidget {
             color: theme.colorScheme.primary,
             trend: classStat.trend,
             trendDirection: _resolveTrendDirection(classStat.trend),
-            animationIndex: 0,
           ),
           ASStatCard(
             title: '学员总数',
@@ -198,7 +283,6 @@ class AdminDashboardPage extends ConsumerWidget {
             color: theme.colorScheme.tertiary,
             trend: studentStat.trend,
             trendDirection: _resolveTrendDirection(studentStat.trend),
-            animationIndex: 1,
           ),
           ASStatCard(
             title: '教练团队',
@@ -208,39 +292,35 @@ class AdminDashboardPage extends ConsumerWidget {
             color: Colors.green,
             trend: coachStat.trend,
             trendDirection: _resolveTrendDirection(coachStat.trend),
-            animationIndex: 2,
           ),
         ];
 
-        return ASSkeletonTransition(
-          isLoading: false,
-          skeleton: skeleton,
-          child: ASResponsiveBuilder(
-            mobile: Column(
-              children: [
-                cards[0],
-                const SizedBox(height: ASSpacing.md),
-                cards[1],
-                const SizedBox(height: ASSpacing.md),
-                cards[2],
-              ],
-            ),
-            tablet: Row(
-              children: [
-                Expanded(child: cards[0]),
-                const SizedBox(width: ASSpacing.md),
-                Expanded(child: cards[1]),
-                const SizedBox(width: ASSpacing.md),
-                Expanded(child: cards[2]),
-              ],
-            ),
-          ),
+        if (isMobile) {
+          return Column(
+            children: [
+              cards[0],
+              const SizedBox(height: ASSpacing.md),
+              cards[1],
+              const SizedBox(height: ASSpacing.md),
+              cards[2],
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: cards[0]),
+            const SizedBox(width: ASSpacing.md),
+            Expanded(child: cards[1]),
+            const SizedBox(width: ASSpacing.md),
+            Expanded(child: cards[2]),
+          ],
         );
       },
     );
   }
 
-  Widget _buildRecentActivity(BuildContext context, WidgetRef ref) {
+  Widget _buildRecentActivityList(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final stream = supabaseClient
         .from('notices')
@@ -255,16 +335,12 @@ class AdminDashboardPage extends ConsumerWidget {
       stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-          return const ASSkeletonCard(height: 200)
-              .animate(delay: 500.ms)
-              .fadeIn(duration: ASAnimations.normal);
+          return const ASSkeletonCard(height: 200);
         }
 
         final notices = snapshot.data ?? [];
         if (notices.isEmpty) {
           return ASCard(
-            animate: true,
-            animationDelay: 500.ms,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: ASSpacing.lg),
               child: Row(
@@ -280,30 +356,39 @@ class AdminDashboardPage extends ConsumerWidget {
         }
 
         return ASCard(
-          animate: true,
-          animationDelay: 500.ms,
+          padding: EdgeInsets.zero,
           child: ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: notices.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
+            separatorBuilder: (context, index) => Divider(
+              height: 1,
+              color: theme.dividerColor.withValues(alpha: 0.5),
+            ),
             itemBuilder: (context, index) {
               final notice = notices[index];
               final color = notice.isUrgent 
                   ? theme.colorScheme.error 
                   : theme.colorScheme.primary;
               return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: color.withValues(alpha: 0.1),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
                   child: Icon(Icons.campaign, color: color, size: 20),
                 ),
-                title: Text(notice.title),
-                subtitle: Text(DateFormatters.relativeTime(notice.createdAt)),
-                contentPadding: EdgeInsets.zero,
-              )
-                  .animate(delay: ASAnimations.getStaggerDelay(index))
-                  .fadeIn(duration: ASAnimations.normal)
-                  .slideX(begin: 0.05, end: 0);
+                title: Text(
+                  notice.title,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text(
+                  DateFormatters.relativeTime(notice.createdAt),
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: ASSpacing.lg, vertical: ASSpacing.xs),
+              );
             },
           ),
         );
@@ -388,4 +473,49 @@ Future<_CountTrend> _loadProfileStat(UserRole role) async {
 
   final label = newThisMonth > 0 ? '+$newThisMonth 本月' : '本月无新增';
   return _CountTrend(total, label);
+}
+
+Future<List<double>> _loadWeeklyAttendanceTrend() async {
+  final now = DateTime.now();
+  // Get start of week (Monday)
+  final startOfWeek = DateTime(now.year, now.month, now.day)
+      .subtract(Duration(days: now.weekday - 1));
+  final endOfWeek = startOfWeek.add(const Duration(days: 7));
+
+  // 1. Fetch sessions for this week
+  final sessionRows = await supabaseClient
+      .from('sessions')
+      .select('id, start_time')
+      .gte('start_time', startOfWeek.toIso8601String())
+      .lt('start_time', endOfWeek.toIso8601String());
+  
+  final sessions = sessionRows as List;
+  if (sessions.isEmpty) return List.filled(7, 0.0);
+
+  final sessionIds = sessions.map((e) => e['id']).toList();
+
+  // 2. Fetch attendance for these sessions (present only)
+  final attendanceRows = await supabaseClient
+      .from('attendance')
+      .select('session_id, status')
+      .filter('session_id', 'in', sessionIds)
+      .eq('status', 'present');
+  
+  final attendanceList = attendanceRows as List;
+
+  // 3. Group by day of week (0=Mon, 6=Sun)
+  final dailyCounts = List.filled(7, 0.0);
+  
+  for (final record in attendanceList) {
+    final sessionId = record['session_id'];
+    final session = sessions.firstWhere((s) => s['id'] == sessionId);
+    final startTime = DateTime.parse(session['start_time']);
+    // weekday is 1..7, we want 0..6
+    final dayIndex = startTime.weekday - 1;
+    if (dayIndex >= 0 && dayIndex < 7) {
+      dailyCounts[dayIndex]++;
+    }
+  }
+
+  return dailyCounts;
 }

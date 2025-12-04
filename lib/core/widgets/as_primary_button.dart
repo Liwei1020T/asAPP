@@ -1,12 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/animations.dart';
-import '../constants/spacing.dart';
+
+/// 基础交互按钮包装器 (处理点击缩放)
+class _InteractiveButtonWrapper extends StatefulWidget {
+  const _InteractiveButtonWrapper({
+    required this.child,
+    this.onPressed,
+  });
+
+  final Widget child;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_InteractiveButtonWrapper> createState() => _InteractiveButtonWrapperState();
+}
+
+class _InteractiveButtonWrapperState extends State<_InteractiveButtonWrapper> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.onPressed == null) return widget.child;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.95 : 1.0,
+        duration: ASAnimations.short,
+        curve: Curves.easeInOut,
+        child: widget.child,
+      ),
+    );
+  }
+}
 
 /// ASP 主按钮组件
 /// 
-/// 支持按压动画和加载状态过渡
-class ASPrimaryButton extends StatefulWidget {
+/// 支持加载状态、点击缩放动画。
+class ASPrimaryButton extends StatelessWidget {
   const ASPrimaryButton({
     super.key,
     required this.label,
@@ -29,114 +63,62 @@ class ASPrimaryButton extends StatefulWidget {
   final Color? backgroundColor;
   final Color? foregroundColor;
   final double height;
-  
-  /// 是否启用入场动画
   final bool animate;
-  
-  /// 自定义动画延迟
   final Duration? animationDelay;
 
   @override
-  State<ASPrimaryButton> createState() => _ASPrimaryButtonState();
-}
-
-class _ASPrimaryButtonState extends State<ASPrimaryButton> {
-  bool _isPressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = widget.backgroundColor ?? theme.colorScheme.primary;
-    final onPrimaryColor = widget.foregroundColor ?? theme.colorScheme.onPrimary;
-
-    Widget button = GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? ASAnimations.buttonPressScale : 1.0,
-        duration: ASAnimations.fast,
-        curve: ASAnimations.defaultCurve,
-        child: SizedBox(
-          height: widget.height,
-          child: ElevatedButton(
-            onPressed: widget.isLoading ? null : widget.onPressed,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: onPrimaryColor,
-              disabledBackgroundColor: primaryColor.withValues(alpha: 0.6),
-              disabledForegroundColor: onPrimaryColor.withValues(alpha: 0.8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-              ),
-              elevation: _isPressed ? 1 : 2,
-            ),
-            child: AnimatedSwitcher(
-              duration: ASAnimations.fast,
-              switchInCurve: ASAnimations.defaultCurve,
-              switchOutCurve: ASAnimations.defaultCurve,
-              child: widget.isLoading
-                  ? SizedBox(
-                      key: const ValueKey('loading'),
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: onPrimaryColor,
-                      ),
-                    )
-                  : Row(
-                      key: const ValueKey('content'),
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (widget.icon != null) ...[
-                          Icon(widget.icon, size: 20),
-                          const SizedBox(width: ASSpacing.sm),
-                        ],
-                        Text(
-                          widget.label,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
+    Widget button = SizedBox(
+      height: height,
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: foregroundColor,
         ),
+        child: isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(label),
+                ],
+              ),
       ),
     );
 
-    if (widget.isFullWidth) {
-      button = SizedBox(
-        width: double.infinity,
-        child: button,
-      );
+    if (isFullWidth) {
+      button = SizedBox(width: double.infinity, child: button);
     }
 
-    if (widget.animate) {
-      return button
-          .animate(delay: widget.animationDelay ?? Duration.zero)
-          .fadeIn(
-            duration: ASAnimations.normal,
-            curve: ASAnimations.defaultCurve,
-          )
-          .slideY(
-            begin: 0.2,
-            end: 0,
-            duration: ASAnimations.normal,
-            curve: ASAnimations.defaultCurve,
-          );
+    // 交互包装
+    button = _InteractiveButtonWrapper(
+      onPressed: isLoading ? null : onPressed,
+      child: button,
+    );
+
+    // 入场动画
+    if (animate) {
+      button = button.animate(delay: animationDelay)
+          .fadeIn(duration: ASAnimations.medium)
+          .slideY(begin: 0.2, end: 0, curve: ASAnimations.emphasized);
     }
 
     return button;
   }
 }
 
-/// ASP 次要按钮（描边样式）
-class ASOutlineButton extends StatefulWidget {
+/// ASP 次要按钮 (Outlined)
+class ASOutlineButton extends StatelessWidget {
   const ASOutlineButton({
     super.key,
     required this.label,
@@ -161,100 +143,59 @@ class ASOutlineButton extends StatefulWidget {
   final Duration? animationDelay;
 
   @override
-  State<ASOutlineButton> createState() => _ASOutlineButtonState();
-}
-
-class _ASOutlineButtonState extends State<ASOutlineButton> {
-  bool _isPressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final buttonColor = widget.color ?? theme.colorScheme.primary;
-
-    Widget button = GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? ASAnimations.buttonPressScale : 1.0,
-        duration: ASAnimations.fast,
-        curve: ASAnimations.defaultCurve,
-        child: SizedBox(
-          height: widget.height,
-          child: OutlinedButton(
-            onPressed: widget.isLoading ? null : widget.onPressed,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: buttonColor,
-              side: BorderSide(color: buttonColor, width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-              ),
-            ),
-            child: AnimatedSwitcher(
-              duration: ASAnimations.fast,
-              child: widget.isLoading
-                  ? SizedBox(
-                      key: const ValueKey('loading'),
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: buttonColor,
-                      ),
-                    )
-                  : Row(
-                      key: const ValueKey('content'),
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (widget.icon != null) ...[
-                          Icon(widget.icon, size: 20),
-                          const SizedBox(width: ASSpacing.sm),
-                        ],
-                        Text(
-                          widget.label,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
+    Widget button = SizedBox(
+      height: height,
+      child: OutlinedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color,
+          side: color != null ? BorderSide(color: color!) : null,
         ),
+        child: isLoading
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: color,
+                ),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(label),
+                ],
+              ),
       ),
     );
 
-    if (widget.isFullWidth) {
-      button = SizedBox(
-        width: double.infinity,
-        child: button,
-      );
+    if (isFullWidth) {
+      button = SizedBox(width: double.infinity, child: button);
     }
 
-    if (widget.animate) {
-      return button
-          .animate(delay: widget.animationDelay ?? Duration.zero)
-          .fadeIn(
-            duration: ASAnimations.normal,
-            curve: ASAnimations.defaultCurve,
-          )
-          .slideY(
-            begin: 0.2,
-            end: 0,
-            duration: ASAnimations.normal,
-            curve: ASAnimations.defaultCurve,
-          );
+    button = _InteractiveButtonWrapper(
+      onPressed: isLoading ? null : onPressed,
+      child: button,
+    );
+
+    if (animate) {
+      button = button.animate(delay: animationDelay)
+          .fadeIn(duration: ASAnimations.medium)
+          .slideY(begin: 0.2, end: 0, curve: ASAnimations.emphasized);
     }
 
     return button;
   }
 }
 
-/// ASP 小型按钮（用于卡片内操作）
-class ASSmallButton extends StatefulWidget {
+/// ASP 小型按钮
+class ASSmallButton extends StatelessWidget {
   const ASSmallButton({
     super.key,
     required this.label,
@@ -271,57 +212,28 @@ class ASSmallButton extends StatefulWidget {
   final Color? foregroundColor;
 
   @override
-  State<ASSmallButton> createState() => _ASSmallButtonState();
-}
-
-class _ASSmallButtonState extends State<ASSmallButton> {
-  bool _isPressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bgColor = widget.backgroundColor ?? theme.colorScheme.primary;
-    final fgColor = widget.foregroundColor ?? theme.colorScheme.onPrimary;
-
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedScale(
-        scale: _isPressed ? ASAnimations.buttonPressScale : 1.0,
-        duration: ASAnimations.fast,
-        curve: ASAnimations.defaultCurve,
-        child: SizedBox(
-          height: 32,
-          child: ElevatedButton(
-            onPressed: widget.onPressed,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: bgColor,
-              foregroundColor: fgColor,
-              padding: const EdgeInsets.symmetric(
-                horizontal: ASSpacing.md,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ASSpacing.buttonRadius),
-              ),
-              elevation: _isPressed ? 0 : 1,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.icon != null) ...[
-                  Icon(widget.icon, size: 16),
-                  const SizedBox(width: ASSpacing.xs),
-                ],
-                Text(
-                  widget.label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+    return _InteractiveButtonWrapper(
+      onPressed: onPressed,
+      child: SizedBox(
+        height: 32,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: backgroundColor,
+            foregroundColor: foregroundColor,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16),
+                const SizedBox(width: 4),
               ],
-            ),
+              Text(label),
+            ],
           ),
         ),
       ),
