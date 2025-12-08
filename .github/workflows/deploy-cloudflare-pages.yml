@@ -35,6 +35,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: asAPP
+          projectName: artsport-app
           directory: build/web
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
