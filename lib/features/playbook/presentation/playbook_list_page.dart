@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:typed_data';
 
+// Native-only File import
+import 'native_file_stub.dart' if (dart.library.io) 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -11,10 +14,11 @@ import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/video_player_widget.dart';
 import '../../../data/models/training_material.dart';
 import '../../../data/repositories/supabase/playbook_repository.dart';
 import '../../auth/application/auth_providers.dart';
-import '../../../data/repositories/supabase/storage_repository.dart';
+import '../../../data/repositories/storage_repository.dart';
 
 // 训练资料分类（静态配置，用于筛选 UI）
 const List<MaterialCategory> _defaultPlaybookCategories = [
@@ -510,16 +514,35 @@ class _PlaybookListPageState extends ConsumerState<PlaybookListPage> {
   }
 
   void _openMaterialContent(TrainingMaterial material) {
-    if (material.type == TrainingMaterialType.image && material.contentUrl != null) {
-      _showImagePreview(context, material.contentUrl!);
-    } else if (material.contentUrl != null) {
-      _launchUrl(material.contentUrl!);
-    } else if (material.thumbnailUrl != null && material.type == TrainingMaterialType.image) {
-      // Fallback to thumbnail if contentUrl is missing but it's an image
-      _showImagePreview(context, material.thumbnailUrl!);
-    } else {
-      // Fallback to detail dialog if no content to open
+    if (material.contentUrl == null) {
+      // 没有内容链接，显示详情对话框
       _showMaterialDetail(material);
+      return;
+    }
+
+    switch (material.type) {
+      case TrainingMaterialType.video:
+        // Windows 桌面平台：在外部播放器中打开（video_player在Windows上有问题）
+        if (Platform.isWindows || Platform.isLinux) {
+          _launchUrl(material.contentUrl!);
+        } else {
+          // 其他平台：使用内嵌视频播放器
+          VideoPreviewDialog.show(
+            context,
+            videoUrl: material.contentUrl!,
+            title: material.title,
+          );
+        }
+        break;
+      case TrainingMaterialType.image:
+        // 图片类型：显示图片预览
+        _showImagePreview(context, material.contentUrl!);
+        break;
+      case TrainingMaterialType.document:
+      case TrainingMaterialType.link:
+        // 文档和链接：在浏览器中打开
+        _launchUrl(material.contentUrl!);
+        break;
     }
   }
 
@@ -621,6 +644,29 @@ class _MaterialCard extends StatelessWidget {
                         _getTypeIconData(material.type),
                         size: 32,
                         color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                // 视频播放按钮覆盖层
+                if (material.type == TrainingMaterialType.video && material.contentUrl != null)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.3),
+                          ],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.play_circle_fill,
+                          size: 56,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -741,9 +787,12 @@ class _CreateMaterialDialog extends ConsumerStatefulWidget {
   static Future<TrainingMaterial?> show(BuildContext context, WidgetRef ref, {TrainingMaterial? initial}) {
     return showDialog<TrainingMaterial>(
       context: context,
-      builder: (_) => Dialog(
-        child: SizedBox(
-          width: 520,
+      builder: (dialogContext) => Dialog(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 520,
+            maxHeight: MediaQuery.of(dialogContext).size.height * 0.85,
+          ),
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: _CreateMaterialDialog(initial: initial),
@@ -766,12 +815,27 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
   TrainingMaterialType _type = TrainingMaterialType.video;
   String? _category;
   bool _isSubmitting = false;
-  Uint8List? _contentBytes;
+  // 改用存储 PlatformFile 引用，避免同步读取大文件导致 UI 卡死
+  PlatformFile? _contentFile;
   Uint8List? _thumbBytes;
-  String? _contentFileName;
   String? _thumbFileName;
-  bool _isUploading = false;
+  bool _isPickingFile = false; // 正在选择文件中
+  bool _isUploadingContent = false;
+  bool _isUploadingThumb = false;
+  double? _contentProgress;
+  String? _contentTargetUrl;
+  bool _contentHalfwayReady = false;
+  double? _thumbProgress;
   String? _uploadError;
+
+  bool get _isUploadingAny => _isUploadingContent || _isUploadingThumb;
+  bool get _canSubmitWhileUploadingContent =>
+      _isUploadingContent &&
+      _contentHalfwayReady &&
+      (_linkController.text.isNotEmpty || _contentTargetUrl != null);
+  bool get _isSubmitBlockedByContentUpload =>
+      _isUploadingContent && !_canSubmitWhileUploadingContent;
+  bool get _isSubmitDisabled => _isSubmitting || _isSubmitBlockedByContentUpload;
 
   bool get isEditing => widget.initial != null;
 
@@ -800,105 +864,224 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
     final categories = _defaultPlaybookCategories;
     return Form(
       key: _formKey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  isEditing ? '编辑训练资料' : '添加训练资料',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    isEditing ? '编辑训练资料' : '添加训练资料',
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: '标题',
+                hintText: '请输入资料标题',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) => value == null || value.isEmpty ? '请输入标题' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _descController,
+              decoration: const InputDecoration(
+                labelText: '描述',
+                hintText: '请输入资料描述',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _category,
+              decoration: const InputDecoration(
+                labelText: '分类',
+                border: OutlineInputBorder(),
+              ),
+              items: categories.map((c) {
+                return DropdownMenuItem(
+                  value: c.name,
+                  child: Text(c.name),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => _category = value),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<TrainingMaterialType>(
+              value: _type,
+              decoration: const InputDecoration(
+                labelText: '类型',
+                border: OutlineInputBorder(),
+              ),
+              items: TrainingMaterialType.values.map((t) {
+                return DropdownMenuItem(
+                  value: t,
+                  child: Text(_getTypeName(t)),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => _type = value!),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _linkController,
+              decoration: const InputDecoration(
+                labelText: '内容链接/URL',
+                hintText: '请输入视频或文档链接',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: (_isUploadingContent || _isPickingFile) ? null : _pickAndUploadContentFile,
+                  icon: (_isUploadingContent || _isPickingFile)
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cloud_upload),
+                  label: Text(_isPickingFile 
+                      ? '正在读取文件...' 
+                      : (_isUploadingContent ? '上传中...' : '上传内容文件')),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _contentFile != null
+                        ? '已选择: ${_contentFile!.name} (${_formatFileSize(_contentFile!.size)})'
+                        : '支持上传图片/视频/文档，上传后自动填充链接',
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            if (_isUploadingContent)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: LinearProgressIndicator(
+                  value: _contentProgress,
+                  minHeight: 6,
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
+            if (_isUploadingContent)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _contentProgress != null && _contentProgress! >= 1.0
+                      ? '等待服务器响应...'
+                      : _canSubmitWhileUploadingContent
+                          ? '已超过50%，可直接保存（后台继续上传） ${_formatPercent(_contentProgress)}'
+                          : '内容上传中 ${_formatPercent(_contentProgress)}，达到50%后可保存',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _thumbController,
+              decoration: const InputDecoration(
+                labelText: '封面链接（可选）',
+                hintText: '图片地址，留空则不设置',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _isUploadingThumb ? null : _pickAndUploadThumb,
+                  icon: _isUploadingThumb
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.image),
+                  label: Text(_isUploadingThumb ? '上传中...' : '上传封面'),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _thumbFileName != null ? '已选择: $_thumbFileName' : '可选：上传封面图将自动填入链接',
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            if (_isUploadingThumb)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: LinearProgressIndicator(
+                  value: _thumbProgress,
+                  minHeight: 6,
+                ),
+              ),
+            if (_isUploadingThumb)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '封面上传中 ${_formatPercent(_thumbProgress)}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            if (_uploadError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _uploadError!,
+                style: const TextStyle(color: ASColors.error, fontSize: 12),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _titleController,
-            decoration: const InputDecoration(
-              labelText: '标题',
-              hintText: '请输入资料标题',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) => value == null || value.isEmpty ? '请输入标题' : null,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _descController,
-            decoration: const InputDecoration(
-              labelText: '描述',
-              hintText: '请输入资料描述',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _category,
-            decoration: const InputDecoration(
-              labelText: '分类',
-              border: OutlineInputBorder(),
-            ),
-            items: categories.map((c) {
-              return DropdownMenuItem(
-                value: c.name,
-                child: Text(c.name),
-              );
-            }).toList(),
-            onChanged: (value) => setState(() => _category = value),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<TrainingMaterialType>(
-            value: _type,
-            decoration: const InputDecoration(
-              labelText: '类型',
-              border: OutlineInputBorder(),
-            ),
-            items: TrainingMaterialType.values.map((t) {
-              return DropdownMenuItem(
-                value: t,
-                child: Text(_getTypeName(t)),
-              );
-            }).toList(),
-            onChanged: (value) => setState(() => _type = value!),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _linkController,
-            decoration: const InputDecoration(
-              labelText: '内容链接/URL',
-              hintText: '请输入视频或文档链接',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('取消'),
-              ),
-              const SizedBox(width: 16),
-              FilledButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(isEditing ? '保存' : '添加'),
+            if (_isUploadingAny) ...[
+              const SizedBox(height: 8),
+              Text(
+                _isUploadingContent
+                    ? '💡 提示：上传超过50%即可保存，后台会继续完成上传，您也可以先关闭对话框'
+                    : '💡 提示：上传会在后台继续，您可以关闭此对话框',
+                style: const TextStyle(color: ASColors.secondary, fontSize: 12),
               ),
             ],
-          ),
-        ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(_isUploadingAny ? '后台上传' : '取消'),
+                ),
+                const SizedBox(width: 16),
+                FilledButton(
+                  onPressed: _isSubmitDisabled ? null : _submit,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(isEditing ? '保存' : '添加'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -916,8 +1099,261 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
     }
   }
 
+  FileType _fileTypeForContent() {
+    switch (_type) {
+      case TrainingMaterialType.image:
+        return FileType.image;
+      case TrainingMaterialType.video:
+        return FileType.video;
+      case TrainingMaterialType.document:
+        return FileType.any;
+      case TrainingMaterialType.link:
+        return FileType.any;
+    }
+  }
+
+  Future<void> _pickAndUploadContentFile() async {
+    setState(() {
+      _uploadError = null;
+      _isPickingFile = true;
+    });
+    
+    try {
+      // 关键：先让 UI 更新显示加载状态
+      await Future.delayed(Duration.zero);
+      
+      final result = await FilePicker.platform.pickFiles(
+        type: _fileTypeForContent(),
+        allowMultiple: false,
+        withData: kIsWeb, // Web 必须用 withData
+        withReadStream: !kIsWeb, // Native 用流式读取
+        allowedExtensions: _type == TrainingMaterialType.document
+            ? ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt']
+            : null,
+      );
+      
+      if (!mounted) return;
+      
+      if (result == null || result.files.isEmpty) {
+        setState(() => _isPickingFile = false);
+        return;
+      }
+
+      final file = result.files.first;
+      
+      // Web 检查 bytes，Native 检查 path 或 readStream
+      if (kIsWeb && file.bytes == null) {
+        setState(() {
+          _isPickingFile = false;
+          _uploadError = '无法读取文件内容，请重试或更换文件。';
+        });
+        return;
+      }
+      if (!kIsWeb && file.path == null) {
+        setState(() {
+          _isPickingFile = false;
+          _uploadError = '无法获取文件路径，请重试或更换文件。';
+        });
+        return;
+      }
+
+      // 立即更新 UI 显示已选择的文件
+      setState(() {
+        _contentFile = file;
+        _isPickingFile = false;
+      });
+
+      // 后台启动上传
+      _startContentUpload();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isPickingFile = false;
+          _uploadError = '选择文件失败：$e';
+        });
+      }
+    }
+  }
+
+  void _startContentUpload() {
+    // 启动后台上传，不阻塞表单填写
+    unawaited(_uploadContentFile());
+  }
+
+  void _updateContentProgress(double rawProgress) {
+    final hasReachedHalf = rawProgress >= 0.5 || _contentHalfwayReady;
+    final normalized = hasReachedHalf && rawProgress < 0.5 ? 0.5 : rawProgress;
+    final clamped = normalized.clamp(0.0, 1.0).toDouble();
+    if (!mounted) return;
+    setState(() {
+      _contentHalfwayReady = hasReachedHalf;
+      _contentProgress = clamped;
+    });
+  }
+
+  Future<void> _uploadContentFile() async {
+    final file = _contentFile;
+    if (file == null) return;
+    
+    final repo = ref.read(storageRepositoryProvider);
+    final userId = ref.read(currentUserProvider)?.id ?? 'unknown';
+    final folder = 'playbook/$userId/${DateTime.now().millisecondsSinceEpoch}';
+    String? targetUrl;
+    try {
+      targetUrl = repo.buildPublicUrl(
+        filename: file.name,
+        folder: folder,
+      );
+    } catch (e) {
+      // 预填 URL 失败不阻塞上传
+    }
+
+    setState(() {
+      _isUploadingContent = true;
+      _contentProgress = 0;
+      _uploadError = null;
+      _contentTargetUrl = targetUrl;
+      if (targetUrl != null) {
+        _linkController.text = targetUrl;
+      }
+    });
+
+    // Web/内存上传文件在选择后已准备好，可提前允许保存
+    final readyInMemory = kIsWeb || (file.bytes != null && file.bytes!.isNotEmpty);
+    if (readyInMemory) {
+      _updateContentProgress(0.5);
+    }
+    
+    try {
+      // Native 平台：从文件路径读取流
+      Stream<List<int>>? fileStream;
+      if (!kIsWeb && file.path != null) {
+        fileStream = File(file.path!).openRead();
+      }
+      
+      final url = await repo.uploadFile(
+        bytes: kIsWeb ? file.bytes : null,
+        stream: fileStream,
+        contentLength: file.size,
+        filename: file.name,
+        folder: folder,
+        onProgress: (p) {
+          _updateContentProgress(p);
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _linkController.text = url;
+        _uploadError = null;
+        _contentTargetUrl = url;
+        _contentHalfwayReady = false;
+      });
+      // 显示成功通知
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ 文件「${file.name}」上传成功！'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadError = '内容上传失败：$e';
+        _contentHalfwayReady = false;
+        _contentTargetUrl = null;
+      });
+      // 显示失败通知
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ 文件「${file.name}」上传失败'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingContent = false;
+          _contentProgress = null;
+          _contentHalfwayReady = false;
+          // 上传完成后不清除 _contentFile，保留显示
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadThumb() async {
+    setState(() => _uploadError = null);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: true, // 封面图较小，直接读取 bytes 不会卡顿
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.first;
+    if (file.bytes == null) {
+      setState(() => _uploadError = '无法读取封面文件，请重试或更换文件。');
+      return;
+    }
+
+    setState(() {
+      _thumbBytes = file.bytes;
+      _thumbFileName = file.name;
+    });
+
+    await _uploadThumbFile();
+  }
+
+  Future<void> _uploadThumbFile() async {
+    if (_thumbBytes == null) return;
+    setState(() {
+      _isUploadingThumb = true;
+      _thumbProgress = 0;
+    });
+    final repo = ref.read(storageRepositoryProvider);
+    final userId = ref.read(currentUserProvider)?.id ?? 'unknown';
+    final folder = 'playbook/$userId/${DateTime.now().millisecondsSinceEpoch}/thumbs';
+
+    try {
+      final url = await repo.uploadFile(
+        bytes: _thumbBytes!,
+        filename: _thumbFileName ?? 'thumb.jpg',
+        folder: folder,
+        onProgress: (p) {
+          if (mounted) {
+            setState(() => _thumbProgress = p);
+          }
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _thumbController.text = url;
+        _uploadError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadError = '封面上传失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingThumb = false;
+          _thumbProgress = null;
+          _thumbBytes = null;
+        });
+      }
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isSubmitBlockedByContentUpload) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('内容文件上传未超过50%，请稍后再保存')),
+      );
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -950,5 +1386,18 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  String _formatPercent(double? value) {
+    if (value == null) return '--%';
+    final pct = (value * 100).clamp(0, 100).toStringAsFixed(0);
+    return '$pct%';
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }

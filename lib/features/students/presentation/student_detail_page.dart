@@ -4,7 +4,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/animations.dart';
@@ -14,7 +13,7 @@ import '../../../core/utils/date_formatters.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../data/models/student.dart';
 import '../../../data/repositories/supabase/student_repository.dart';
-import '../../../data/repositories/supabase/storage_repository.dart';
+import '../../../data/repositories/storage_repository.dart';
 
 class StudentDetailPage extends ConsumerStatefulWidget {
   final String studentId;
@@ -345,19 +344,17 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
 
     final bytes = result.files.first.bytes as Uint8List;
     final fileName = result.files.first.name;
-    final storageRepo = ref.read(supabaseStorageRepositoryProvider);
+    final storageRepo = ref.read(storageRepositoryProvider);
     final studentRepo = ref.read(supabaseStudentRepositoryProvider);
-    final path = 'avatars/students/${student.id}/${DateTime.now().millisecondsSinceEpoch}-$fileName';
+    final folder = 'avatars/students/${student.id}';
+    final timestampedName = '${DateTime.now().millisecondsSinceEpoch}-$fileName';
 
     try {
-      final url = await storageRepo.uploadBytes(
+      final url = await storageRepo.uploadFile(
         bytes: bytes,
-        bucket: 'avatars',
-        path: path,
-        fileOptions: const FileOptions(
-          upsert: false,
-          contentType: 'image/jpeg',
-        ),
+        filename: timestampedName,
+        folder: folder,
+        contentType: 'image/jpeg',
       );
 
       final updated = student.copyWith(

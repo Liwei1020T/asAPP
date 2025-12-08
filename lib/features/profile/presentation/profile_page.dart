@@ -13,7 +13,7 @@ import '../../../core/constants/spacing.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../data/models/profile.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
-import '../../../data/repositories/supabase/storage_repository.dart';
+import '../../../data/repositories/storage_repository.dart';
 import '../../auth/application/auth_providers.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -356,23 +356,20 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (profile == null) return;
 
     setState(() => _uploadingAvatar = true);
-    final storageRepo = ref.read(supabaseStorageRepositoryProvider);
+    final storageRepo = ref.read(storageRepositoryProvider);
     final authRepo = ref.read(supabaseAuthRepositoryProvider);
 
     try {
       final bytes = result.files.first.bytes as Uint8List;
       final fileName = result.files.first.name;
-      final path =
-          'avatars/${profile.id}/${DateTime.now().millisecondsSinceEpoch}-$fileName';
+      final folder = 'avatars/${profile.id}';
+      final timestampedName = '${DateTime.now().millisecondsSinceEpoch}-$fileName';
 
-      final url = await storageRepo.uploadBytes(
+      final url = await storageRepo.uploadFile(
         bytes: bytes,
-        bucket: 'avatars',
-        path: path,
-        fileOptions: const FileOptions(
-          upsert: false,
-          contentType: 'image/jpeg',
-        ),
+        filename: timestampedName,
+        folder: folder,
+        contentType: 'image/jpeg',
       );
 
       final updated = await authRepo.updateProfile(

@@ -34,7 +34,7 @@ The system is designed around four core roles (Admin, Coach, Parent, Student) an
     *   **Salary Reports**: View detailed monthly income breakdowns.
 
 *   **📢 Communication & Interaction**
-    *   **Timeline**: A social media-like feed where coaches post training photos/videos and parents can like and comment.
+    *   **Timeline**: A social media-like feed where coaches post training photos/videos, parents can like and comment, and authors/admins can delete posts.
     *   **Notices**: Publish important announcements (holidays, tournaments) with support for pinning and urgent marking.
     *   **Playbook**: Shared teaching materials (videos/documents) with category management.
 
@@ -46,7 +46,7 @@ This project utilizes the cutting-edge technology stack within the Flutter ecosy
 *   **Language**: Dart 3.x
 *   **State Management**: [Riverpod 2.x/3.x](https://riverpod.dev/) (Generator syntax)
 *   **Routing**: [GoRouter](https://pub.dev/packages/go_router)
-*   **Backend Service**: [Supabase](https://supabase.com/) (PostgreSQL + Auth + Storage + Realtime)
+*   **Backend Service**: [Supabase](https://supabase.com/) (PostgreSQL + Auth + Realtime) + local filesystem storage (`local_storage/` served over HTTP)
 *   **UI Component Library**: Material 3 Design with Custom Premium System
 *   **Animations**: [flutter_animate](https://pub.dev/packages/flutter_animate)
 *   **Skeleton Screens**: [shimmer](https://pub.dev/packages/shimmer)
@@ -105,22 +105,25 @@ cd asp_ms
 flutter pub get
 ```
 
-### 4. Supabase Configuration
+### 4. Supabase & Storage Configuration
 
 1.  Create a new [Supabase](https://supabase.com/) project.
 2.  **Schema Setup**: Run the `dataSetUp.sql` script (located in the project root) in your Supabase SQL Editor. This script will:
     *   Create all necessary tables (Profiles, Sessions, Attendance, etc.).
     *   Set up Row Level Security (RLS) policies.
     *   Create test users and initial data.
-3.  **Storage Setup**: Run the `supabase/create_buckets.sql` script to set up storage:
-    *   Creates `timeline` and `playbook` buckets.
-    *   Configures public access policies.
-4.  **Essential Fixes & Updates**: Run the following scripts in order to ensure correct functionality:
+3.  **Storage**: File uploads are saved locally under `local_storage/` (auto-created) and served via your own HTTP endpoint. Default public base URL is `http://localhost:9000` (see `lib/core/config/storage_config.dart`). Start a static server, e.g.:
+
+```bash
+python3 -m http.server 9000 --directory local_storage
+```
+4.  **App Credentials**:
+    *   Enter your `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `lib/main.dart` (or your environment configuration file).
+5.  **Essential Fixes & Updates**: Run the following scripts in order to ensure correct functionality:
     *   `supabase/fix_attendance_trigger.sql`: Fixes remaining session deduction logic.
     *   `supabase/fix_coach_shifts_fk.sql`: Fixes foreign key constraints for class deletion.
     *   `supabase/update_sessions_rls.sql`: Updates RLS to allow coaches to claim unassigned sessions.
     *   `supabase/remove_duplicate_sessions.sql`: (Optional) Cleans up any duplicate sessions.
-5.  Enter your `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `lib/main.dart` (or your environment configuration file).
 
 ### 5. Run the Project
 

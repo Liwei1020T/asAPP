@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/spacing.dart';
@@ -14,7 +13,7 @@ import '../../../data/models/timeline_comment.dart';
 import '../../../data/repositories/supabase/timeline_repository.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
-import '../../../data/repositories/supabase/storage_repository.dart';
+import '../../../data/repositories/storage_repository.dart';
 
 /// 训练动态 Timeline 列表页
 class TimelineListPage extends ConsumerStatefulWidget {
@@ -27,6 +26,7 @@ class TimelineListPage extends ConsumerStatefulWidget {
 class _TimelineListPageState extends ConsumerState<TimelineListPage> {
   Set<String> _likedPostIds = {};
   bool _likedLoaded = false;
+  double? _uploadProgress;
 
   Future<void> _loadLiked(String userId) async {
     try {
@@ -161,8 +161,52 @@ class _TimelineListPageState extends ConsumerState<TimelineListPage> {
         onLike: () => _toggleLike(post.id, isLiked),
         onComment: () => _showComments(context, post),
         onShare: () => _sharePost(post),
+        canDelete: _canDeletePost(post),
+        onDelete: () => _deletePost(post),
       ),
     );
+  }
+
+  bool _canDeletePost(TimelinePost post) {
+    final currentUser = ref.read(currentUserProvider);
+    final role = ref.read(currentUserRoleProvider);
+    if (currentUser == null) return false;
+    return currentUser.id == post.authorId || role == UserRole.admin;
+  }
+
+  Future<bool> _deletePost(TimelinePost post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除动态'),
+        content: const Text('确定要删除这条训练动态吗？评论和点赞也会一并删除。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除', style: TextStyle(color: ASColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+
+    try {
+      await ref.read(supabaseTimelineRepositoryProvider).deletePost(post.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('动态已删除')),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除失败：$e')),
+        );
+      }
+      return false;
+    }
   }
 
   void _showCreatePostDialog() {
@@ -571,6 +615,8 @@ class _PostDetailSheet extends ConsumerWidget {
     required this.onLike,
     required this.onComment,
     required this.onShare,
+    required this.canDelete,
+    required this.onDelete,
   });
 
   final TimelinePost post;
@@ -578,6 +624,8 @@ class _PostDetailSheet extends ConsumerWidget {
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onShare;
+  final bool canDelete;
+  final Future<bool> Function() onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -588,6 +636,8 @@ class _PostDetailSheet extends ConsumerWidget {
       onLike: onLike,
       onComment: onComment,
       onShare: onShare,
+      canDelete: canDelete,
+      onDelete: onDelete,
     );
   }
 }
@@ -599,6 +649,8 @@ class _PostDetailSheetBody extends ConsumerStatefulWidget {
     required this.onLike,
     required this.onComment,
     required this.onShare,
+    required this.canDelete,
+    required this.onDelete,
   });
 
   final TimelinePost post;
@@ -606,6 +658,8 @@ class _PostDetailSheetBody extends ConsumerStatefulWidget {
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onShare;
+  final bool canDelete;
+  final Future<bool> Function() onDelete;
 
   @override
   ConsumerState<_PostDetailSheetBody> createState() => _PostDetailSheetBodyState();
@@ -615,6 +669,7 @@ class _PostDetailSheetBodyState extends ConsumerState<_PostDetailSheetBody> {
   late bool _isLiked;
   late int _likesCount;
   late int _commentsCount;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -630,6 +685,17 @@ class _PostDetailSheetBodyState extends ConsumerState<_PostDetailSheetBody> {
       _likesCount = (_likesCount + (_isLiked ? 1 : -1)).clamp(0, 1 << 31);
     });
     widget.onLike();
+  }
+
+  Future<void> _handleDelete() async {
+    if (_isDeleting) return;
+    setState(() => _isDeleting = true);
+    final success = await widget.onDelete();
+    if (!mounted) return;
+    setState(() => _isDeleting = false);
+    if (success) {
+      Navigator.of(context).pop(); // 关闭详情弹窗
+    }
   }
 
   @override
@@ -705,6 +771,18 @@ class _PostDetailSheetBodyState extends ConsumerState<_PostDetailSheetBody> {
                                   ],
                                 ),
                               ),
+                              if (widget.canDelete)
+                                IconButton(
+                                  tooltip: '删除',
+                                  onPressed: _isDeleting ? null : _handleDelete,
+                                  icon: _isDeleting
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.delete_outline, color: ASColors.error),
+                                ),
                             ],
                           );
                         },
@@ -1016,6 +1094,7 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
   String? _pickedVideoName;
   bool _isUploading = false;
   bool _uploadFailed = false;
+  double? _uploadProgress;
 
   @override
   void dispose() {
@@ -1030,15 +1109,23 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
         withData: true,
         allowMultiple: false,
       );
-      if (result != null &&
-          result.files.isNotEmpty &&
-          result.files.first.bytes != null) {
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final bytes = await _loadBytes(file);
+        if (bytes == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('无法读取视频文件，请重试或更换文件')),
+            );
+          }
+          return;
+        }
         setState(() {
           _selectedMediaType = MediaType.video;
           _pickedImageBytes.clear();
           _pickedImageNames.clear();
-          _pickedVideoBytes = result.files.first.bytes;
-          _pickedVideoName = result.files.first.name;
+          _pickedVideoBytes = bytes;
+          _pickedVideoName = file.name;
         });
       }
     } else {
@@ -1048,18 +1135,35 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
         allowMultiple: true,
       );
       if (result != null && result.files.isNotEmpty) {
-        final files = result.files.where((f) => f.bytes != null).toList();
+        final files = result.files.where((f) => f.bytes != null || f.readStream != null).toList();
         if (files.isEmpty) return;
+        final loadedBytes = <Uint8List>[];
+        final names = <String>[];
+        for (final f in files) {
+          final bytes = await _loadBytes(f);
+          if (bytes != null) {
+            loadedBytes.add(bytes);
+            names.add(f.name);
+          }
+        }
+        if (loadedBytes.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('无法读取图片文件，请重试或更换文件')),
+            );
+          }
+          return;
+        }
         setState(() {
           _selectedMediaType = MediaType.image;
           _pickedVideoBytes = null;
           _pickedVideoName = null;
           _pickedImageBytes
             ..clear()
-            ..addAll(files.map((f) => f.bytes!));
+            ..addAll(loadedBytes);
           _pickedImageNames
             ..clear()
-            ..addAll(files.map((f) => f.name));
+            ..addAll(names);
         });
       }
     }
@@ -1084,12 +1188,13 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
       _isLoading = true;
       _isUploading = true;
       _uploadFailed = false;
+      _uploadProgress = 0;
     });
 
     try {
       final currentUser = ref.read(currentUserProvider);
+      final storageRepo = ref.read(storageRepositoryProvider);
       final timelineRepoSupabase = ref.read(supabaseTimelineRepositoryProvider);
-      final storageRepo = ref.read(supabaseStorageRepositoryProvider);
 
       final now = DateTime.now();
       final basePath =
@@ -1098,50 +1203,54 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
       var mediaType = MediaType.image;
 
       try {
-        if (_pickedVideoBytes != null) {
+        if (_selectedMediaType == MediaType.video && _pickedVideoBytes != null) {
           mediaType = MediaType.video;
-          final path = '$basePath-video-${_pickedVideoName ?? 'media.mp4'}';
-          final url = await storageRepo.uploadBytes(
+          final ext = _pickedVideoName?.split('.').last ?? 'mp4';
+          final filename = 'video.$ext';
+          
+          final url = await storageRepo.uploadFile(
             bytes: _pickedVideoBytes!,
-            bucket: 'timeline',
-            path: path,
-            fileOptions: const FileOptions(
-              upsert: false,
-              contentType: 'video/mp4',
-            ),
+            filename: filename,
+            folder: basePath,
+            onProgress: (p) {
+              if (mounted) setState(() => _uploadProgress = p);
+            },
           );
           mediaUrls.add(url);
-        } else {
+        } else if (_selectedMediaType == MediaType.image &&
+            _pickedImageBytes.isNotEmpty) {
           mediaType = MediaType.image;
           for (var i = 0; i < _pickedImageBytes.length; i++) {
             final bytes = _pickedImageBytes[i];
-            final name = i < _pickedImageNames.length
-                ? _pickedImageNames[i]
-                : 'image-$i.jpg';
-            final path = '$basePath-img-$i-$name';
-            final url = await storageRepo.uploadBytes(
+            final name = _pickedImageNames[i];
+            final ext = name.split('.').last;
+            final filename = 'image_$i.$ext';
+
+            final url = await storageRepo.uploadFile(
               bytes: bytes,
-              bucket: 'timeline',
-              path: path,
-              fileOptions: const FileOptions(
-                upsert: false,
-                contentType: 'image/jpeg',
-              ),
+              filename: filename,
+              folder: basePath,
+              onProgress: (p) {
+                if (mounted) setState(() => _uploadProgress = p);
+              },
             );
             mediaUrls.add(url);
           }
         }
       } catch (e) {
-        _uploadFailed = true;
+        debugPrint('Upload failed: $e');
         setState(() {
           _isUploading = false;
+          _uploadFailed = true;
           _isLoading = false;
+          _uploadProgress = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('上传失败：$e'), backgroundColor: ASColors.error),
+          SnackBar(content: Text('上传媒体失败：$e')),
         );
         return;
       }
+
 
       final post = TimelinePost(
         id: 'post-${DateTime.now().millisecondsSinceEpoch}',
@@ -1176,6 +1285,7 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
         setState(() {
           _isLoading = false;
           _isUploading = false;
+          _uploadProgress = null;
           _pickedImageBytes.clear();
           _pickedImageNames.clear();
           _pickedVideoBytes = null;
@@ -1183,6 +1293,18 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
         });
       }
     }
+  }
+
+  Future<Uint8List?> _loadBytes(PlatformFile file) async {
+    if (file.bytes != null) return file.bytes;
+    if (file.readStream != null) {
+      final buffer = <int>[];
+      await for (final chunk in file.readStream!) {
+        buffer.addAll(chunk);
+      }
+      return Uint8List.fromList(buffer);
+    }
+    return null;
   }
 
   Widget _buildMediaPreview() {
@@ -1246,9 +1368,12 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
                     ),
                   ),
                 if (_isUploading)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: LinearProgressIndicator(minHeight: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: LinearProgressIndicator(
+                      minHeight: 6,
+                      value: _uploadProgress,
+                    ),
                   ),
               ],
             ),

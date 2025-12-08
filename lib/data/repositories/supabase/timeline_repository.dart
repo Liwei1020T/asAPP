@@ -117,6 +117,14 @@ class SupabaseTimelineRepository {
       'content': content,
     });
   }
+
+  /// 删除动态及其关联点赞/评论
+  Future<void> deletePost(String postId) async {
+    // 清理关联表，避免孤立数据
+    await supabaseClient.from('timeline_likes').delete().eq('post_id', postId);
+    await supabaseClient.from('timeline_comments').delete().eq('post_id', postId);
+    await supabaseClient.from('timeline_posts').delete().eq('id', postId);
+  }
 }
 
 final supabaseTimelineRepositoryProvider = Provider<SupabaseTimelineRepository>((ref) {

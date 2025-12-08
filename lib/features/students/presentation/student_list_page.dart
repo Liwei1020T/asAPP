@@ -13,7 +13,6 @@ import '../../../core/utils/responsive_utils.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../data/models/student.dart';
 import '../../../data/repositories/supabase/student_repository.dart';
-import '../../../data/repositories/supabase/storage_repository.dart';
 
 class StudentListPage extends ConsumerStatefulWidget {
   const StudentListPage({super.key});
