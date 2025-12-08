@@ -28,7 +28,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Flutter web
-        run: flutter build web --release --web-renderer canvaskit
+        run: flutter build web --release
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
@@ -38,4 +38,3 @@ jobs:
           projectName: asAPP
           directory: build/web
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-
