@@ -97,6 +97,48 @@ cloudflared tunnel run asp-local
 - 如需后台运行，可用 `nohup`、systemd 或进程管理器（例如 pm2）托管 `cloudflared` 与存储服务。
 - 定期备份 `local_storage/`（存放所有上传文件）。
 
+## 8. 建议的文件命名与目录结构（Playbook / Timeline）
+
+为了后期维护和手动排查更方便，应用已统一采用「按业务实体分文件夹」的命名方式。默认根目录仍是：
+
+- `local_storage/`
+
+之下主要有两类业务子目录：
+
+### 8.1 训练手册 Playbook
+
+每一条训练资料，都会拥有一个独立的 `materialKey`，所有相关文件放在同一个目录：
+
+- 目录：`local_storage/playbook/<userId>/<materialKey>/`
+  - 内容文件：`content.<ext>`（视频 / 文档 / 图片）
+  - 封面：`thumb.<ext>`
+
+其中：
+
+- `userId`：Supabase `profiles.id`，方便按作者归档。
+- `materialKey`：由标题 + 时间戳自动生成的 slug，例如：
+  - 标题「高远球基础」→ `gao-yuan-qiu-ji-chu_1733630000000`
+
+这样同一条资料的内容和封面始终在一起，便于迁移和备份。
+
+### 8.2 训练动态 Timeline
+
+每一条动态帖子，也会生成一个 `postKey` 目录：
+
+- 目录：`local_storage/timeline/<userId>/<postKey>/`
+  - 若为视频：
+    - `video.<ext>`
+  - 若为多张图片：
+    - `image_0.<ext>`
+    - `image_1.<ext>`
+    - `image_2.<ext>` ...
+
+`postKey` 同样由内容文本 + 时间戳生成的 slug 组成，便于根据帖子大致内容快速定位到对应目录。
+
+> 说明：
+> - 旧数据不会被重命名，仍然使用之前的时间戳目录；
+> - 新增/编辑之后上传的内容会自动使用上述新结构。
+
 ## 7. 在一台电脑连接多个 Tunnel 的方法
 
 你可以在同一台机器上创建多个隧道，常见场景：

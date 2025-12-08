@@ -830,6 +830,7 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
   bool _contentHalfwayReady = false;
   double? _thumbProgress;
   String? _uploadError;
+  String? _materialStorageKey;
 
   bool get _isUploadingAny => _isUploadingContent || _isUploadingThumb;
   bool get _canSubmitWhileUploadingContent =>
@@ -851,6 +852,50 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
     _thumbController = TextEditingController(text: widget.initial?.thumbnailUrl ?? '');
     _type = widget.initial?.type ?? TrainingMaterialType.video;
     _category = widget.initial?.category;
+  }
+
+  /// 将标题转成适合路径的短 slug，例如 "高远球基础" -> "gao-yuan-qiu-ji-chu"
+  String _slugify(String input) {
+    var value = input.toLowerCase();
+    // 非字母数字统一替换为 -
+    value = value.replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    // 合并多余的 -
+    value = value.replaceAll(RegExp('-+'), '-');
+    // 去掉首尾 -
+    value = value.replaceAll(RegExp(r'^-+|-+$'), '');
+    if (value.isEmpty) {
+      return 'material';
+    }
+    return value;
+  }
+
+  /// 确保在一次编辑会话中，内容文件和封面文件共用同一个 materialKey。
+  /// 结构：playbook/<userId>/<materialKey>/content.xxx / thumb.xxx
+  String _ensureMaterialStorageKey(String userId) {
+    if (_materialStorageKey != null) {
+      return _materialStorageKey!;
+    }
+
+    // 如果是编辑已有资料，尝试从旧的 URL 中解析出已有的 key，避免新旧混在一起。
+    final existingUrl = widget.initial?.contentUrl ?? widget.initial?.thumbnailUrl;
+    if (existingUrl != null && existingUrl.isNotEmpty) {
+      final uri = Uri.tryParse(existingUrl);
+      final path = uri?.path ?? existingUrl;
+      final match = RegExp(r'playbook/([^/]+)/([^/]+)/').firstMatch(path);
+      if (match != null) {
+        final existingUserId = match.group(1);
+        final key = match.group(2);
+        if (existingUserId == userId && key != null && key.isNotEmpty) {
+          _materialStorageKey = key;
+          return _materialStorageKey!;
+        }
+      }
+    }
+
+    final now = DateTime.now();
+    final slug = _slugify(_titleController.text.trim());
+    _materialStorageKey = '${slug}_${now.millisecondsSinceEpoch}';
+    return _materialStorageKey!;
   }
 
   @override
@@ -1200,11 +1245,15 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
     
     final repo = ref.read(storageRepositoryProvider);
     final userId = ref.read(currentUserProvider)?.id ?? 'unknown';
-    final folder = 'playbook/$userId/${DateTime.now().millisecondsSinceEpoch}';
+    final materialKey = _ensureMaterialStorageKey(userId);
+    final folder = 'playbook/$userId/$materialKey';
+    final nameParts = file.name.split('.');
+    final ext = nameParts.length > 1 ? nameParts.last : null;
+    final safeFilename = ext == null ? 'content' : 'content.$ext';
     String? targetUrl;
     try {
       targetUrl = repo.buildPublicUrl(
-        filename: file.name,
+        filename: safeFilename,
         folder: folder,
       );
     } catch (e) {
@@ -1238,7 +1287,7 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
         bytes: kIsWeb ? file.bytes : null,
         stream: fileStream,
         contentLength: file.size,
-        filename: file.name,
+        filename: safeFilename,
         folder: folder,
         onProgress: (p) {
           _updateContentProgress(p);
@@ -1317,12 +1366,17 @@ class _CreateMaterialDialogState extends ConsumerState<_CreateMaterialDialog> {
     });
     final repo = ref.read(storageRepositoryProvider);
     final userId = ref.read(currentUserProvider)?.id ?? 'unknown';
-    final folder = 'playbook/$userId/${DateTime.now().millisecondsSinceEpoch}/thumbs';
+    final materialKey = _ensureMaterialStorageKey(userId);
+    final folder = 'playbook/$userId/$materialKey';
+    final originalName = _thumbFileName ?? 'thumb.jpg';
+    final parts = originalName.split('.');
+    final ext = parts.length > 1 ? parts.last : 'jpg';
+    final safeFilename = 'thumb.$ext';
 
     try {
       final url = await repo.uploadFile(
         bytes: _thumbBytes!,
-        filename: _thumbFileName ?? 'thumb.jpg',
+        filename: safeFilename,
         folder: folder,
         onProgress: (p) {
           if (mounted) {

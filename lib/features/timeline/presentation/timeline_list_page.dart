@@ -1095,11 +1095,33 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
   bool _isUploading = false;
   bool _uploadFailed = false;
   double? _uploadProgress;
+  String? _postStorageKey;
 
   @override
   void dispose() {
     _contentController.dispose();
     super.dispose();
+  }
+
+  String _slugify(String input) {
+    var value = input.toLowerCase();
+    value = value.replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    value = value.replaceAll(RegExp('-+'), '-');
+    value = value.replaceAll(RegExp(r'^-+|-+$'), '');
+    if (value.isEmpty) {
+      return 'post';
+    }
+    return value;
+  }
+
+  String _ensurePostStorageKey(String userId, DateTime now) {
+    if (_postStorageKey != null) {
+      return _postStorageKey!;
+    }
+    final content = _contentController.text.trim();
+    final slug = _slugify(content.isEmpty ? 'post' : content);
+    _postStorageKey = '${slug}_${now.millisecondsSinceEpoch}';
+    return _postStorageKey!;
   }
 
   Future<void> _pickMedia(MediaType type) async {
@@ -1197,8 +1219,9 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
       final timelineRepoSupabase = ref.read(supabaseTimelineRepositoryProvider);
 
       final now = DateTime.now();
-      final basePath =
-          'timeline/${currentUser?.id ?? 'unknown'}/${now.millisecondsSinceEpoch}';
+      final userId = currentUser?.id ?? 'unknown';
+      final postKey = _ensurePostStorageKey(userId, now);
+      final basePath = 'timeline/$userId/$postKey';
       final mediaUrls = <String>[];
       var mediaType = MediaType.image;
 
