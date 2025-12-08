@@ -14,6 +14,8 @@ import '../../features/dashboard/presentation/coach_dashboard_page.dart';
 import '../../features/dashboard/presentation/parent_dashboard_page.dart';
 import '../../features/dashboard/presentation/admin_dashboard_page.dart';
 import '../../features/attendance/presentation/attendance_page.dart';
+import '../../features/attendance/presentation/admin_leave_list_page.dart';
+import '../../features/attendance/presentation/parent_child_attendance_page.dart';
 import '../../features/classes/presentation/admin_class_list_page.dart';
 import '../../features/classes/presentation/admin_class_detail_page.dart';
 import '../../features/coaches/presentation/coach_list_page.dart';
@@ -303,6 +305,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
+            path: '/parent/child-attendance',
+            name: 'parent-child-attendance',
+            pageBuilder: (context, state) {
+              final student = state.extra as Student;
+              return _buildPageWithTransition(
+                context: context,
+                state: state,
+                child: ParentChildAttendancePage(child: student),
+              );
+            },
+          ),
+          GoRoute(
             path: '/parent/timeline',
             name: 'parent-timeline',
             pageBuilder: (context, state) => _buildPageWithTransition(
@@ -373,6 +387,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                 iconSelected: Icons.photo_library,
                 route: '/admin/timeline',
               ),
+              ShellDestination(
+                label: '请假记录',
+                iconOutlined: Icons.event_busy_outlined,
+                iconSelected: Icons.event_busy,
+                route: '/admin/leaves',
+              ),
             ],
             body: child,
           );
@@ -385,6 +405,15 @@ final routerProvider = Provider<GoRouter>((ref) {
               context: context,
               state: state,
               child: const AdminDashboardPage(),
+            ),
+          ),
+          GoRoute(
+            path: '/admin/leaves',
+            name: 'admin-leaves',
+            pageBuilder: (context, state) => _buildPageWithTransition(
+              context: context,
+              state: state,
+              child: const AdminLeaveListPage(),
             ),
           ),
           GoRoute(
@@ -559,6 +588,7 @@ int _getAdminSelectedIndex(String path) {
   if (path.startsWith('/admin/playbook')) return 4;
   if (path.startsWith('/admin/notices')) return 5;
   if (path.startsWith('/admin/timeline')) return 6;
+  if (path.startsWith('/admin/leaves')) return 7;
   return 0;
 }
 
@@ -571,6 +601,7 @@ void _onAdminDestinationSelected(BuildContext context, int index) {
     case 4: context.go('/admin/playbook'); break;
     case 5: context.go('/admin/notices'); break;
     case 6: context.go('/admin/timeline'); break;
+    case 7: context.go('/admin/leaves'); break;
   }
 }
 
@@ -638,6 +669,7 @@ bool _isAuthorized(UserRole role, String location) {
     return location.startsWith('/parent-dashboard') ||
         location.startsWith('/parent/timeline') ||
         location.startsWith('/parent/playbook') ||
+        location.startsWith('/parent/child-attendance') ||
         location.startsWith('/link-children') ||
         location.startsWith('/profile');
   }

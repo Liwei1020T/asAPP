@@ -417,6 +417,145 @@ create policy "attendance_write_admin_or_coach" on attendance for all using (
   or exists (select 1 from sessions s where s.id = session_id and s.coach_id = auth.uid())
 );
 
+-- =====================================================
+-- 学员请假 + 补课资格
+-- =====================================================
+
+-- 1) 请假申请表：leave_requests
+create table if not exists leave_requests (
+  id uuid primary key default gen_random_uuid(),
+  student_id text not null references students(id) on delete cascade,
+  session_id uuid not null references sessions(id) on delete cascade,
+  reason text,
+  status text not null check (status in ('pending','approved','rejected')) default 'approved',
+  need_makeup boolean not null default true,
+  expires_at timestamptz,
+  max_uses int not null default 1,
+  created_by uuid references profiles(id),
+  created_at timestamptz not null default now(),
+  processed_at timestamptz
+);
+
+-- 确保一个学生对同一堂课只会有一条请假记录
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_indexes
+    where schemaname = 'public'
+      and indexname = 'idx_leave_requests_unique_student_session'
+  ) then
+    create unique index idx_leave_requests_unique_student_session
+      on leave_requests (student_id, session_id);
+  end if;
+end $$;
+
+alter table leave_requests enable row level security;
+
+-- RLS：所有已登录用户可读，请假、审批仅管理员
+drop policy if exists "leave_requests_select_auth" on leave_requests;
+create policy "leave_requests_select_auth" on leave_requests
+  for select using (auth.role() = 'authenticated');
+
+-- 教练/管理员：可管理所有请假记录
+drop policy if exists "leave_requests_write_staff" on leave_requests;
+create policy "leave_requests_write_staff" on leave_requests
+  for all
+  using (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+    )
+  )
+  with check (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+    )
+  );
+
+-- 家长：只能为自己名下的学生创建请假记录
+drop policy if exists "leave_requests_insert_parent" on leave_requests;
+create policy "leave_requests_insert_parent" on leave_requests
+  for insert
+  with check (
+    exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  );
+
+-- 2) 补课资格表：session_makeup_rights
+create table if not exists session_makeup_rights (
+  id uuid primary key default gen_random_uuid(),
+  student_id text not null references students(id) on delete cascade,
+  source_session_id uuid not null references sessions(id) on delete cascade,
+  class_id uuid not null references class_groups(id) on delete cascade,
+  leave_request_id uuid references leave_requests(id) on delete set null,
+  status text not null check (status in ('active','used','expired','cancelled')) default 'active',
+  max_uses int not null default 1,
+  used_count int not null default 0,
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 确保每堂课只生成一条补课资格（每个学生）
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_indexes
+    where schemaname = 'public'
+      and indexname = 'idx_session_makeup_rights_unique_source'
+  ) then
+    create unique index idx_session_makeup_rights_unique_source
+      on session_makeup_rights (student_id, source_session_id);
+  end if;
+end $$;
+
+alter table session_makeup_rights enable row level security;
+
+drop policy if exists "session_makeup_rights_select_auth" on session_makeup_rights;
+create policy "session_makeup_rights_select_auth" on session_makeup_rights
+  for select using (auth.role() = 'authenticated');
+
+-- 教练/管理员：可管理所有补课资格
+drop policy if exists "session_makeup_rights_write_staff" on session_makeup_rights;
+create policy "session_makeup_rights_write_staff" on session_makeup_rights
+  for all
+  using (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+    )
+  )
+  with check (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+    )
+  );
+
+-- 家长：只能为自己名下的学生创建补课资格（通常由触发器/应用逻辑生成）
+drop policy if exists "session_makeup_rights_insert_parent" on session_makeup_rights;
+create policy "session_makeup_rights_insert_parent" on session_makeup_rights
+  for insert
+  with check (
+    exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  );
+
 -- Notices
 create table if not exists notices (
   id uuid primary key default gen_random_uuid(),
@@ -721,41 +860,49 @@ values ('timeline', 'timeline', true)
 on conflict (id) do nothing;
 
 -- Policy: Public Access for Playbook
+drop policy if exists "Public Access Playbook" on storage.objects;
 create policy "Public Access Playbook"
   on storage.objects for select
   using ( bucket_id = 'playbook' );
 
 -- Policy: Authenticated users can upload to Playbook
+drop policy if exists "Authenticated Upload Playbook" on storage.objects;
 create policy "Authenticated Upload Playbook"
   on storage.objects for insert
   with check ( bucket_id = 'playbook' and auth.role() = 'authenticated' );
 
 -- Policy: Users can update their own files in Playbook
+drop policy if exists "Owner Update Playbook" on storage.objects;
 create policy "Owner Update Playbook"
   on storage.objects for update
   using ( bucket_id = 'playbook' and auth.uid() = owner );
 
 -- Policy: Users can delete their own files in Playbook
+drop policy if exists "Owner Delete Playbook" on storage.objects;
 create policy "Owner Delete Playbook"
   on storage.objects for delete
   using ( bucket_id = 'playbook' and auth.uid() = owner );
 
 -- Policy: Public Access for Timeline
+drop policy if exists "Public Access Timeline" on storage.objects;
 create policy "Public Access Timeline"
   on storage.objects for select
   using ( bucket_id = 'timeline' );
 
 -- Policy: Authenticated users can upload to Timeline
+drop policy if exists "Authenticated Upload Timeline" on storage.objects;
 create policy "Authenticated Upload Timeline"
   on storage.objects for insert
   with check ( bucket_id = 'timeline' and auth.role() = 'authenticated' );
 
 -- Policy: Users can update their own files in Timeline
+drop policy if exists "Owner Update Timeline" on storage.objects;
 create policy "Owner Update Timeline"
   on storage.objects for update
   using ( bucket_id = 'timeline' and auth.uid() = owner );
 
 -- Policy: Users can delete their own files in Timeline
+drop policy if exists "Owner Delete Timeline" on storage.objects;
 create policy "Owner Delete Timeline"
   on storage.objects for delete
   using ( bucket_id = 'timeline' and auth.uid() = owner );

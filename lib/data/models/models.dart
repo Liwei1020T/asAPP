@@ -8,3 +8,6 @@ export 'timeline_post.dart';
 export 'training_material.dart';
 export 'coach_shift.dart';
 export 'student.dart';
+export 'leave_request.dart';
+export 'session_makeup_right.dart';
+export 'student_session_attendance.dart';

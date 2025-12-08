@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/session.dart';
+import '../../models/attendance.dart';
+import '../../models/student_session_attendance.dart';
 import 'supabase_client_provider.dart';
 
 /// Supabase 课程/排课仓库
@@ -89,6 +91,78 @@ class SupabaseSessionsRepository {
         .eq('class_id', classId)
         .order('start_time', ascending: false);
     return data.map((e) => _mapSession(e)).toList();
+  }
+
+  /// 获取某学生指定月份的课程列表及出勤状态（用于家长端）
+  Future<List<StudentSessionAttendance>> getMonthlySessionsForStudent(
+    String studentId, {
+    required DateTime monthStart,
+  }) async {
+    // 1. 查该学生所在的班级
+    final memberships = await supabaseClient
+        .from('class_memberships')
+        .select('class_id')
+        .eq('student_id', studentId)
+        .eq('is_active', true);
+    final membershipList = memberships as List;
+    if (membershipList.isEmpty) return [];
+
+    final classIds = membershipList
+        .map((e) => (e as Map<String, dynamic>)['class_id'] as String)
+        .toList();
+
+    // 当月时间范围
+    final startOfMonth = DateTime(monthStart.year, monthStart.month, 1);
+    final startOfNextMonth =
+        DateTime(monthStart.year, monthStart.month + 1, 1);
+
+    // 2. 查当月这些班级的所有 sessions
+    final sessionsData = await supabaseClient
+        .from('sessions')
+        .select()
+        .inFilter('class_id', classIds)
+        .gte('start_time', startOfMonth.toIso8601String())
+        .lt('start_time', startOfNextMonth.toIso8601String())
+        .order('start_time', ascending: true);
+
+    final sessionRows = sessionsData as List;
+    if (sessionRows.isEmpty) return [];
+
+    final sessions = sessionRows
+        .map((e) => _mapSession(e as Map<String, dynamic>))
+        .toList();
+    final sessionIds = sessions.map((s) => s.id).toList();
+
+    // 3. 查该学生在这些 sessions 上的出勤记录
+    final attendanceData = await supabaseClient
+        .from('attendance')
+        .select('session_id, status')
+        .eq('student_id', studentId)
+        .inFilter('session_id', sessionIds);
+
+    final attendanceList = attendanceData as List;
+    final statusBySessionId = <String, AttendanceStatus>{};
+    for (final row in attendanceList) {
+      final map = row as Map<String, dynamic>;
+      final sid = map['session_id'] as String;
+      final statusStr = map['status'] as String?;
+      if (statusStr == null) continue;
+      final status = AttendanceStatus.values.firstWhere(
+        (e) => e.name == statusStr,
+        orElse: () => AttendanceStatus.present,
+      );
+      statusBySessionId[sid] = status;
+    }
+
+    // 4. 组合视图模型
+    return sessions
+        .map(
+          (s) => StudentSessionAttendance(
+            session: s,
+            status: statusBySessionId[s.id],
+          ),
+        )
+        .toList();
   }
 
   /// 实时订阅班级课程

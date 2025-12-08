@@ -13,6 +13,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../data/models/models.dart';
 import '../../../data/repositories/supabase/attendance_repository.dart';
 import '../../../data/repositories/supabase/sessions_repository.dart';
+import '../../../data/repositories/supabase/leave_repository.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../../data/repositories/supabase/auth_repository.dart';
 import '../../../data/repositories/supabase/student_repository.dart';
@@ -134,9 +135,41 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   }
 
   void _updateStatus(int index, AttendanceStatus status) {
+    final previous = _attendanceList[index];
+
     setState(() {
       _attendanceList[index] = _attendanceList[index].copyWith(status: status);
     });
+
+    if (status == AttendanceStatus.leave &&
+        previous.status != AttendanceStatus.leave) {
+      _handleLeaveWithMakeup(previous);
+    }
+  }
+
+  void _updateCoachNote(int index, String? note) {
+    setState(() {
+      _attendanceList[index] =
+          _attendanceList[index].copyWith(coachNote: note);
+    });
+  }
+
+  Future<void> _handleLeaveWithMakeup(Attendance attendance) async {
+    final session = _session;
+    if (session == null) return;
+
+    try {
+      await ref.read(supabaseLeaveRepositoryProvider).createLeaveWithMakeup(
+            studentId: attendance.studentId,
+            sessionId: session.id,
+            reason: attendance.coachNote,
+          );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('请假补课资格生成失败：$e')),
+      );
+    }
   }
 
   void _subscribeAttendance() {
@@ -647,9 +680,47 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
         return _StudentAttendanceCard(
           attendance: attendance,
           onStatusChanged: (status) => _updateStatus(index, status),
+          onEditNote: () => _showEditNoteDialog(index),
         );
       },
     );
+  }
+
+  Future<void> _showEditNoteDialog(int index) async {
+    final attendance = _attendanceList[index];
+    final controller = TextEditingController(text: attendance.coachNote ?? '');
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('教练备注'),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: '例如：迟到 10 分钟；家长临时接走等',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      _updateCoachNote(index, result.isEmpty ? null : result);
+    }
   }
 
   Widget _buildSubmitBar() {
@@ -731,10 +802,12 @@ class _StudentAttendanceCard extends StatelessWidget {
   const _StudentAttendanceCard({
     required this.attendance,
     required this.onStatusChanged,
+    required this.onEditNote,
   });
 
   final Attendance attendance;
   final ValueChanged<AttendanceStatus> onStatusChanged;
+  final VoidCallback onEditNote;
 
   @override
   Widget build(BuildContext context) {
@@ -802,6 +875,20 @@ class _StudentAttendanceCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: ASSpacing.sm),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: onEditNote,
+              icon: const Icon(Icons.edit_note, size: 18),
+              label: Text(
+                (attendance.coachNote ?? '').isEmpty ? '添加备注' : '编辑备注',
+              ),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
           ),
         ],
       ),

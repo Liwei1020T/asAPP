@@ -20,13 +20,35 @@ The Attendance feature allows coaches and admins to manage class attendance and 
 - **Status Tracking**: Mark students as:
     - **Present**: Student is attending the class.
     - **Absent**: Student is missing.
-    - **Leave**: Student has requested leave.
+    - **Leave**: Student is marked on leave (see Leave & Makeup below).
 - **Guest Students**: Allows adding temporary or guest students to the roll call for a specific session.
 
 ### 4. Submission & Statistics
 - **Real-time Updates**: Syncs attendance status in real-time (using Supabase streams).
 - **Summary Stats**: Displays counts for Present, Absent, and Leave students.
 - **Submit**: Saves the final attendance record to the database.
+
+### 5. Leave Requests & Makeup Rights
+- **Auto Leave Request**: When a student is marked as **Leave** on the Attendance Page, the system will:
+  - Upsert a record into `leave_requests` for `(student_id, session_id)` (default status `approved`).
+  - Auto-generate a **makeup right** in `session_makeup_rights` with:
+    - `student_id`: The student on leave.
+    - `source_session_id`: The original session.
+    - `class_id`: The class of that session.
+    - `max_uses`: Default `1`.
+    - `expires_at`: Default 30 days after the session start time.
+  - Ensure there is an `attendance` row with status `leave` for that session/student.
+- **Idempotent Behavior**: Re-marking the same student/session as Leave will not create duplicate records thanks to unique indexes and `upsert` logic.
+
+### 6. Admin Leave List
+- **Admin View**: An admin-only page `/admin/leaves` shows all leave requests in reverse chronological order.
+- **Displayed Fields**:
+  - Student name (looked up from `students.full_name`).
+  - Session date (from `sessions.start_time`).
+  - Leave status (`pending / approved / rejected` as a tag).
+- **Navigation**:
+  - In the Admin shell side menu, there is a **“请假记录”** destination pointing to `/admin/leaves`.
+
 
 ## Technical Components
 
@@ -40,6 +62,8 @@ The Attendance feature allows coaches and admins to manage class attendance and 
 - `HrRepository`: Manages coach shifts (clock-in/clock-out).
 - `SessionsRepository`: Fetches session details.
 - `AuthRepository`: Fetches coach and admin profiles.
+- `LeaveRepository`:
+  - `createLeaveWithMakeup`: Creates/updates a leave request, generates a corresponding `session_makeup_rights` record, and sets the student's attendance status to `leave`.
 
 ## User Roles & Permissions
 - **Admin**: Can take attendance at any time.

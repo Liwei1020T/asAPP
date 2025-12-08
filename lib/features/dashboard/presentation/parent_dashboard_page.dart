@@ -284,7 +284,7 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
     );
   }
 
-  /// 孩子出勤区块
+/// 孩子出勤区块
   Widget _buildChildrenAttendanceSection(bool isDark) {
     if (_isLoading) {
       return Padding(
@@ -322,6 +322,10 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
           padding: const EdgeInsets.only(bottom: ASSpacing.md),
           child: _ChildAttendanceCard(
             child: entry.value,
+            onTap: () => context.push(
+              '/parent/child-attendance',
+              extra: entry.value,
+            ),
           ).animate(delay: (entry.key * 100).ms).fadeIn().slideX(),
         )).toList(),
       ),
@@ -471,9 +475,11 @@ class _ParentDashboardPageState extends ConsumerState<ParentDashboardPage> {
 class _ChildAttendanceCard extends ConsumerWidget {
   const _ChildAttendanceCard({
     required this.child,
+    this.onTap,
   });
 
   final Student child;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -485,6 +491,7 @@ class _ChildAttendanceCard extends ConsumerWidget {
         final summary = snapshot.data;
 
         return ASCard.glass(
+          onTap: onTap,
           padding: const EdgeInsets.all(ASSpacing.cardPadding),
           child: Row(
             children: [

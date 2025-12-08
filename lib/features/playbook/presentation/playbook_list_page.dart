@@ -523,7 +523,10 @@ class _PlaybookListPageState extends ConsumerState<PlaybookListPage> {
     switch (material.type) {
       case TrainingMaterialType.video:
         // Windows 桌面平台：在外部播放器中打开（video_player在Windows上有问题）
-        if (Platform.isWindows || Platform.isLinux) {
+        final isDesktop = !kIsWeb &&
+            (defaultTargetPlatform == TargetPlatform.windows ||
+                defaultTargetPlatform == TargetPlatform.linux);
+        if (isDesktop) {
           _launchUrl(material.contentUrl!);
         } else {
           // 其他平台：使用内嵌视频播放器

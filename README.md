@@ -161,6 +161,8 @@ Key data table relationships:
 *   **class_groups**: Class definitions
 *   **sessions**: Specific class sessions (linked to class_groups, coaches, venues)
 *   **attendance**: Attendance records (linked to sessions, students)
+*   **leave_requests**: Student leave requests for specific sessions (drives leave history)
+*   **session_makeup_rights**: Makeup entitlements generated from approved leaves
 *   **coach_shifts**: Coach shift records
 *   **timeline_posts**: Timeline posts
 *   **notices**: System announcements
