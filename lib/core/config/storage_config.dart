@@ -9,5 +9,5 @@ class StorageConfig {
   /// Public base URL that serves files from [baseDirectory].
   /// Example: when you run `python3 -m http.server 9000 --directory local_storage`,
   /// set this to `http://localhost:9000` (or your Cloudflare Tunnel domain).
-  static const String publicBaseUrl = 'http://localhost:9000';
+  static const String publicBaseUrl = 'https://asp-media.li-wei.net/';
 }
