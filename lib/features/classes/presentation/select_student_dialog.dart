@@ -172,7 +172,9 @@ class _SelectStudentDialogState extends ConsumerState<SelectStudentDialog> {
                                               style: const TextStyle(fontWeight: FontWeight.w500),
                                             ),
                                             Text(
-                                              '剩余课时 ${student.remainingSessions} / ${student.totalSessions}',
+                                              '${student.age ?? '-'}岁 · '
+                                              '${student.gender ?? '未知'} · '
+                                              '${getStudentLevelName(student.level)}',
                                               style: Theme.of(context).textTheme.bodySmall,
                                             ),
                                           ],

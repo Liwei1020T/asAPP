@@ -28,7 +28,6 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
   Map<String, dynamic> _stats = const {
     'total': 0,
     'active': 0,
-    'lowBalance': 0,
     'graduated': 0,
   };
   final _searchController = TextEditingController();
@@ -243,16 +242,6 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
     final nameController = TextEditingController(text: student?.fullName ?? '');
     final parentNameController = TextEditingController(text: student?.parentName ?? '');
     final phoneController = TextEditingController(text: student?.emergencyPhone ?? '');
-    final totalSessionsController = TextEditingController(
-      text: student != null && student.totalSessions > 0
-          ? student.totalSessions.toString()
-          : '',
-    );
-    final remainingSessionsController = TextEditingController(
-      text: student != null && student.remainingSessions > 0
-          ? student.remainingSessions.toString()
-          : '',
-    );
     StudentLevel selectedLevel = student?.level ?? StudentLevel.beginner;
     String selectedGender = student?.gender ?? '男';
     DateTime? selectedBirthDate = student?.birthDate;
@@ -406,40 +395,6 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
                     ),
                     keyboardType: TextInputType.phone,
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '课时设置',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: totalSessionsController,
-                          decoration: const InputDecoration(
-                            labelText: '本月总课时（节） *',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: remainingSessionsController,
-                          decoration: const InputDecoration(
-                            labelText: '当前剩余课时（节）',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -461,28 +416,6 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
                   return;
                 }
 
-                final totalText = totalSessionsController.text.trim();
-                final remainingText = remainingSessionsController.text.trim();
-                final total = int.tryParse(totalText);
-                if (total == null || total < 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('请填写有效的本月总课时（非负整数）')),
-                  );
-                  return;
-                }
-
-                int? remaining = int.tryParse(remainingText);
-                final originalRemaining = student?.remainingSessions ?? total;
-                if (remaining == null || remaining < 0) {
-                  remaining = isEditing ? originalRemaining : total;
-                }
-                if (remaining > total) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('剩余课时不能大于总课时')),
-                  );
-                  return;
-                }
-
                 Navigator.pop(context);
                 final newStudent = _buildStudentFromForm(
                   student,
@@ -492,8 +425,6 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
                   parentNameController.text.trim(),
                   phoneController.text.trim(),
                   selectedBirthDate!,
-                  totalSessions: total,
-                  remainingSessions: remaining,
                   status: selectedStatus,
                 );
                 await _saveStudent(newStudent, isEditing);
@@ -515,8 +446,7 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
     String parentName,
     String emergencyPhone,
     DateTime birthDate,
-    {required int totalSessions, required int remainingSessions, required StudentStatus status}
-  ) {
+    {required StudentStatus status}) {
     final now = DateTime.now();
     return Student(
       id: original?.id ?? 'student-${now.millisecondsSinceEpoch}',
@@ -528,8 +458,8 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
       emergencyPhone: emergencyPhone.isEmpty ? null : emergencyPhone,
       birthDate: birthDate,
       enrollmentDate: original?.enrollmentDate ?? now,
-      remainingSessions: remainingSessions,
-      totalSessions: totalSessions,
+      remainingSessions: original?.remainingSessions ?? 0,
+      totalSessions: original?.totalSessions ?? 0,
       attendanceRate: original?.attendanceRate ?? 0,
       notes: original?.notes,
       avatarUrl: original?.avatarUrl,
@@ -569,11 +499,9 @@ class _StudentListPageState extends ConsumerState<StudentListPage> {
     final total = students.length;
     final active = students.where((s) => s.status == StudentStatus.active).length;
     final graduated = students.where((s) => s.status == StudentStatus.graduated).length;
-    final lowBalance = students.where((s) => s.remainingSessions <= 2).length;
     return {
       'total': total,
       'active': active,
-      'lowBalance': lowBalance,
       'graduated': graduated,
     };
   }
@@ -628,7 +556,10 @@ class _StudentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${student.age ?? '-'}岁 · ${getStudentLevelName(student.level)} · ${student.parentName ?? '家长未知'}',
+                  '${student.age ?? '-'}岁 · '
+                  '${student.gender ?? '未知'} · '
+                  '${getStudentLevelName(student.level)} · '
+                  '${student.parentName ?? '家长未知'}',
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: 13,

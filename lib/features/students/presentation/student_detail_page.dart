@@ -207,6 +207,7 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
 
   Widget _buildSessionInfo(Student student) {
     final theme = Theme.of(context);
+    final rate = student.attendanceRate.clamp(0.0, 1.0);
     return ASCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,9 +215,9 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('课时余额'),
+              const Text('出勤概览'),
               Text(
-                '${student.remainingSessions}/${student.totalSessions}',
+                '${(rate * 100).toStringAsFixed(1)}%',
                 style: TextStyle(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
@@ -226,19 +227,13 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
           ),
           const SizedBox(height: ASSpacing.sm),
           LinearProgressIndicator(
-            value: student.sessionBalancePercent,
+            value: rate,
             backgroundColor: theme.colorScheme.surfaceContainerHighest,
             valueColor: AlwaysStoppedAnimation(
-              student.remainingSessions <= 5 ? ASColors.warning : ASColors.primary,
+              rate >= 0.8 ? ASColors.success : ASColors.primary,
             ),
             borderRadius: BorderRadius.circular(4),
           ),
-          const SizedBox(height: ASSpacing.md),
-          const Divider(),
-          const SizedBox(height: ASSpacing.md),
-          _buildDetailRow('剩余课时', '${student.remainingSessions} 节'),
-          _buildDetailRow('总课时', '${student.totalSessions} 节'),
-          _buildDetailRow('出勤率', '${(student.attendanceRate * 100).toStringAsFixed(1)}%'),
         ],
       ),
     );
@@ -386,12 +381,9 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
     final nameController = TextEditingController(text: student.fullName);
     final parentNameController = TextEditingController(text: student.parentName ?? '');
     final phoneController = TextEditingController(text: student.emergencyPhone ?? '');
-    final totalSessionsController = TextEditingController(text: student.totalSessions.toString());
-    final remainingSessionsController = TextEditingController(text: student.remainingSessions.toString());
     
     StudentLevel selectedLevel = student.level;
     String selectedGender = student.gender ?? '男';
-    DateTime selectedBirthDate = student.birthDate ?? DateTime.now();
     StudentStatus selectedStatus = student.status;
 
     showDialog(
@@ -410,8 +402,46 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                     decoration: const InputDecoration(labelText: '学员姓名 *'),
                   ),
                   const SizedBox(height: 16),
-                  // ... (Simplified for brevity, ideally reuse a form widget)
-                  // For now, I'll just implement the critical fields
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selectedGender,
+                          decoration: const InputDecoration(labelText: '性别'),
+                          items: const [
+                            DropdownMenuItem(value: '男', child: Text('男')),
+                            DropdownMenuItem(value: '女', child: Text('女')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setDialogState(() => selectedGender = value);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButtonFormField<StudentLevel>(
+                          value: selectedLevel,
+                          decoration: const InputDecoration(labelText: '等级'),
+                          items: StudentLevel.values
+                              .map(
+                                (level) => DropdownMenuItem(
+                                  value: level,
+                                  child: Text(getStudentLevelName(level)),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setDialogState(() => selectedLevel = value);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   DropdownButtonFormField<StudentStatus>(
                     value: selectedStatus,
                     decoration: const InputDecoration(labelText: '状态'),
@@ -423,14 +453,13 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: totalSessionsController,
-                    decoration: const InputDecoration(labelText: '总课时'),
-                    keyboardType: TextInputType.number,
+                    controller: parentNameController,
+                    decoration: const InputDecoration(labelText: '家长姓名'),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: remainingSessionsController,
-                    decoration: const InputDecoration(labelText: '剩余课时'),
+                    controller: phoneController,
+                    decoration: const InputDecoration(labelText: '紧急电话'),
                     keyboardType: TextInputType.number,
                   ),
                 ],
@@ -446,9 +475,15 @@ class _StudentDetailPageState extends ConsumerState<StudentDetailPage> {
               onPressed: () async {
                 final updated = student.copyWith(
                   fullName: nameController.text.trim(),
+                  gender: selectedGender,
+                  level: selectedLevel,
                   status: selectedStatus,
-                  totalSessions: int.tryParse(totalSessionsController.text) ?? student.totalSessions,
-                  remainingSessions: int.tryParse(remainingSessionsController.text) ?? student.remainingSessions,
+                  parentName: parentNameController.text.trim().isEmpty
+                      ? null
+                      : parentNameController.text.trim(),
+                  emergencyPhone: phoneController.text.trim().isEmpty
+                      ? null
+                      : phoneController.text.trim(),
                   updatedAt: DateTime.now(),
                 );
                 

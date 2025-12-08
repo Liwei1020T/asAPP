@@ -514,28 +514,35 @@ class _ChildAttendanceCard extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: ASSpacing.xs),
-                    Text(
-                      '剩余课时 ${child.remainingSessions}/${child.totalSessions}',
-                      style: theme.textTheme.bodySmall,
-                    ),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    '${summary?.presentCount ?? 0}/${summary?.totalSessions ?? 0}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: ASColors.primary,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final total = summary?.totalSessions ?? 0;
+                      final rate = summary?.attendanceRate ?? 0;
+                      final rateText =
+                          total == 0 ? '--' : '${(rate * 100).toStringAsFixed(0)}%';
+                      final rateColor = total == 0
+                          ? theme.colorScheme.outline
+                          : ASColors.primary;
+
+                      return Text(
+                        rateText,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: rateColor,
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: ASSpacing.xs),
                   Text(
-                    '${DateFormatters.month(DateTime.now())}出勤',
+                    '${DateFormatters.month(DateTime.now())}出勤率',
                     style: theme.textTheme.labelSmall,
                   ),
                 ],

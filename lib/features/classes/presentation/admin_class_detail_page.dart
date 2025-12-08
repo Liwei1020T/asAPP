@@ -553,7 +553,9 @@ class _StudentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: ASSpacing.xs),
                 Text(
-                  '剩余课时 ${student.remainingSessions} / ${student.totalSessions}',
+                  '${student.age ?? '-'}岁 · '
+                  '${student.gender ?? '未知'} · '
+                  '${getStudentLevelName(student.level)}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],

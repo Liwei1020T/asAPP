@@ -417,6 +417,56 @@ create policy "attendance_write_admin_or_coach" on attendance for all using (
   or exists (select 1 from sessions s where s.id = session_id and s.coach_id = auth.uid())
 );
 
+-- 家长：仅可为自己名下的学生创建/更新「请假」考勤记录
+drop policy if exists "attendance_leave_parent_insert" on attendance;
+create policy "attendance_leave_parent_insert" on attendance
+  for insert
+  with check (
+    status = 'leave'
+    and exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  );
+
+drop policy if exists "attendance_leave_parent_update" on attendance;
+create policy "attendance_leave_parent_update" on attendance
+  for update
+  using (
+    status = 'leave'
+    and exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  )
+  with check (
+    status = 'leave'
+    and exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  );
+
+-- 确保每个学生在同一堂课只有一条考勤记录（支持 upsert on (session_id, student_id)）
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_indexes
+    where schemaname = 'public'
+      and indexname = 'idx_attendance_unique_session_student'
+  ) then
+    create unique index idx_attendance_unique_session_student
+      on attendance (session_id, student_id);
+  end if;
+end $$;
+
 -- =====================================================
 -- 学员请假 + 补课资格
 -- =====================================================
@@ -457,10 +507,11 @@ drop policy if exists "leave_requests_select_auth" on leave_requests;
 create policy "leave_requests_select_auth" on leave_requests
   for select using (auth.role() = 'authenticated');
 
--- 教练/管理员：可管理所有请假记录
+-- 教练/管理员：可管理所有请假记录（更新、删除）
 drop policy if exists "leave_requests_write_staff" on leave_requests;
-create policy "leave_requests_write_staff" on leave_requests
-  for all
+drop policy if exists "leave_requests_staff_update" on leave_requests;
+create policy "leave_requests_staff_update" on leave_requests
+  for update
   using (
     exists (
       select 1 from profiles p
@@ -476,10 +527,43 @@ create policy "leave_requests_write_staff" on leave_requests
     )
   );
 
+drop policy if exists "leave_requests_staff_delete" on leave_requests;
+drop policy if exists "leave_requests_staff_delete" on leave_requests;
+create policy "leave_requests_staff_delete" on leave_requests
+  for delete
+  using (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+    )
+  );
+
 -- 家长：只能为自己名下的学生创建请假记录
 drop policy if exists "leave_requests_insert_parent" on leave_requests;
 create policy "leave_requests_insert_parent" on leave_requests
   for insert
+  with check (
+    exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  );
+
+-- 家长：允许更新自己孩子的请假记录（用于 upsert 场景）
+drop policy if exists "leave_requests_update_parent" on leave_requests;
+create policy "leave_requests_update_parent" on leave_requests
+  for update
+  using (
+    exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  )
   with check (
     exists (
       select 1
@@ -524,10 +608,85 @@ drop policy if exists "session_makeup_rights_select_auth" on session_makeup_righ
 create policy "session_makeup_rights_select_auth" on session_makeup_rights
   for select using (auth.role() = 'authenticated');
 
--- 教练/管理员：可管理所有补课资格
+-- 教练/管理员：可管理所有补课资格（更新、删除）
 drop policy if exists "session_makeup_rights_write_staff" on session_makeup_rights;
-create policy "session_makeup_rights_write_staff" on session_makeup_rights
-  for all
+drop policy if exists "session_makeup_rights_staff_update" on session_makeup_rights;
+create policy "session_makeup_rights_staff_update" on session_makeup_rights
+  for update
+  using (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+    )
+  )
+  with check (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+  )
+  );
+
+-- 3) 补课预约表：session_replacements（记录家长实际选择的补课课次）
+create table if not exists session_replacements (
+  id uuid primary key default gen_random_uuid(),
+  student_id text not null references students(id) on delete cascade,
+  source_session_id uuid not null references sessions(id) on delete cascade,
+  target_session_id uuid not null references sessions(id) on delete cascade,
+  makeup_right_id uuid references session_makeup_rights(id) on delete set null,
+  status text check (status in ('booked','completed','cancelled')) default 'booked',
+  created_by uuid references profiles(id),
+  created_at timestamptz not null default now()
+);
+
+-- 每个请假记录只对应一条补课预约；同一个学生不会对同一节课重复预约
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_indexes
+    where schemaname = 'public'
+      and indexname = 'idx_session_replacements_unique_source'
+  ) then
+    create unique index idx_session_replacements_unique_source
+      on session_replacements (student_id, source_session_id);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_indexes
+    where schemaname = 'public'
+      and indexname = 'idx_session_replacements_unique_target'
+  ) then
+    create unique index idx_session_replacements_unique_target
+      on session_replacements (student_id, target_session_id);
+  end if;
+end $$;
+
+alter table session_replacements enable row level security;
+
+drop policy if exists "session_replacements_select_auth" on session_replacements;
+create policy "session_replacements_select_auth" on session_replacements
+  for select using (auth.role() = 'authenticated');
+
+-- 家长：可以为自己名下的学生预约补课
+drop policy if exists "session_replacements_insert_parent" on session_replacements;
+create policy "session_replacements_insert_parent" on session_replacements
+  for insert
+  with check (
+    exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  );
+
+-- 教练/管理员：可更新/删除所有补课预约
+drop policy if exists "session_replacements_staff_update" on session_replacements;
+create policy "session_replacements_staff_update" on session_replacements
+  for update
   using (
     exists (
       select 1 from profiles p
@@ -543,10 +702,54 @@ create policy "session_makeup_rights_write_staff" on session_makeup_rights
     )
   );
 
+drop policy if exists "session_replacements_staff_delete" on session_replacements;
+create policy "session_replacements_staff_delete" on session_replacements
+  for delete
+  using (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+    )
+  );
+
+drop policy if exists "session_makeup_rights_staff_delete" on session_makeup_rights;
+drop policy if exists "session_makeup_rights_staff_delete" on session_makeup_rights;
+create policy "session_makeup_rights_staff_delete" on session_makeup_rights
+  for delete
+  using (
+    exists (
+      select 1 from profiles p
+      where p.id = auth.uid()
+        and p.role in ('admin','coach')
+    )
+  );
+
 -- 家长：只能为自己名下的学生创建补课资格（通常由触发器/应用逻辑生成）
 drop policy if exists "session_makeup_rights_insert_parent" on session_makeup_rights;
 create policy "session_makeup_rights_insert_parent" on session_makeup_rights
   for insert
+  with check (
+    exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  );
+
+-- 家长：允许更新自己孩子的补课资格（用于 upsert 场景）
+drop policy if exists "session_makeup_rights_update_parent" on session_makeup_rights;
+create policy "session_makeup_rights_update_parent" on session_makeup_rights
+  for update
+  using (
+    exists (
+      select 1
+      from students s
+      where s.id = student_id
+        and s.parent_id = auth.uid()
+    )
+  )
   with check (
     exists (
       select 1

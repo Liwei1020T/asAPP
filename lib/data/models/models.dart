@@ -11,3 +11,4 @@ export 'student.dart';
 export 'leave_request.dart';
 export 'session_makeup_right.dart';
 export 'student_session_attendance.dart';
+export 'session_replacement.dart';

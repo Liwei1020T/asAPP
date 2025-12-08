@@ -93,6 +93,27 @@ class SupabaseSessionsRepository {
     return data.map((e) => _mapSession(e)).toList();
   }
 
+  /// 获取某学生可用的补课课次：
+  /// - 所有班级的未来课程（不限制当前是否在该班）
+  /// - 未被取消
+  Future<List<Session>> getMakeupCandidateSessionsForStudent(
+    String _studentId,
+  ) async {
+    final now = DateTime.now().toIso8601String();
+
+    final sessionsData = await supabaseClient
+        .from('sessions')
+        .select()
+        .gt('start_time', now)
+        .not('status', 'eq', SessionStatus.cancelled.name)
+        .order('start_time', ascending: true);
+
+    final rows = sessionsData as List;
+    return rows
+        .map((e) => _mapSession(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// 获取某学生指定月份的课程列表及出勤状态（用于家长端）
   Future<List<StudentSessionAttendance>> getMonthlySessionsForStudent(
     String studentId, {
