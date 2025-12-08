@@ -24,8 +24,8 @@ The Dashboard feature serves as the central landing page for all users, providin
 
 ### 3. Parent Dashboard
 - **Children Overview**:
-    - **Attendance**: Summary of each child's attendance record (Present/Total).
-    - **Session Balance**: View remaining sessions for each child.
+    - **Attendance**: Monthly attendance rate (%) for each child, based on their attendance records.
+    - **Leave & Makeup Entry**: Quick access to the child's detailed attendance page, where parents can request leave and book makeup classes.
 - **Training Moments**: Feed of photos and videos (Timeline posts) featuring their children.
 - **Notices**: View announcements relevant to parents.
 - **Child Management**: Link new children to the parent account using Student ID.

@@ -38,7 +38,9 @@ The system supports various media formats:
 - `PlaybookRepository`:
     - `watchMaterials`: Real-time stream of all training materials.
     - `createMaterial` / `updateMaterial` / `deleteMaterial`: Manages the lifecycle of playbook entries.
-- `StorageRepository`: Upload helper that writes to local disk under `local_storage/playbook/...` and returns URLs based on `StorageConfig.publicBaseUrl`.
+- `StorageRepository`: Upload helper that sends files to the HTTP upload endpoint configured via
+  `StorageConfig.publicBaseUrl` (for example a Cloudflare‑exposed server writing into `local_storage/playbook/...`)
+  and returns a public URL saved in `TrainingMaterial.contentUrl`.
 
 ## Data Models
 - **TrainingMaterial**:

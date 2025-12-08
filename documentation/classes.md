@@ -13,7 +13,7 @@ The Classes feature is the core module for managing training groups, student enr
 
 ### 2. Student Enrollment
 - **Manage Students**: Add or remove students from a class.
-- **Student List**: View all students currently enrolled in the class, along with their remaining session counts.
+- **Student List**: View all students currently enrolled in the class, including their gender, level, and status.
 - **Add Student**: Select from existing students in the system to add them to the class.
 
 ### 3. Session Scheduling

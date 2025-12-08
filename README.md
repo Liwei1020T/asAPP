@@ -14,7 +14,7 @@ The system is designed around four core roles (Admin, Coach, Parent, Student) an
 *   **📊 Dashboard**
     *   **Admin**: Global data overview, quick access shortcuts.
     *   **Coach**: View **all** upcoming sessions (not just assigned ones), to-do list, income overview.
-    *   **Parent/Student**: Class schedule, attendance records, latest updates.
+    *   **Parent/Student**: Class schedule, monthly attendance, leave & makeup overview, latest updates.
 
 *   **📅 Class & Attendance Management**
     *   **Class Management**: Create classes of different levels (Basic/Advanced), set schedules, venues, and default coaches.
@@ -26,7 +26,7 @@ The system is designed around four core roles (Admin, Coach, Parent, Student) an
     *   **Smart Clock-In**: Coaches automatically clock in when starting a class, claiming the session if it was unassigned.
 
 *   **👥 Personnel Management**
-    *   **Student Profiles**: Manage student basic info, remaining sessions, and parent associations.
+    *   **Student Profiles**: Manage student basic info (including gender/age), attendance stats, and parent associations.
     *   **Coach Profiles**: Manage coach info and session rates.
 
 *   **💰 Salary & Finance**
@@ -46,7 +46,9 @@ This project utilizes the cutting-edge technology stack within the Flutter ecosy
 *   **Language**: Dart 3.x
 *   **State Management**: [Riverpod 2.x/3.x](https://riverpod.dev/) (Generator syntax)
 *   **Routing**: [GoRouter](https://pub.dev/packages/go_router)
-*   **Backend Service**: [Supabase](https://supabase.com/) (PostgreSQL + Auth + Realtime) + local filesystem storage (`local_storage/` served over HTTP)
+*   **Backend Service**: [Supabase](https://supabase.com/) (PostgreSQL + Auth + Realtime + Storage)  
+    * Supabase Storage is used for production media (timeline/playbook).  
+    * Local filesystem storage (`local_storage/` served over HTTP) is available as a **development-only** option; see `documentation/cloudflare_self_host.md`.
 *   **UI Component Library**: Material 3 Design with Custom Premium System
 *   **Animations**: [flutter_animate](https://pub.dev/packages/flutter_animate)
 *   **Skeleton Screens**: [shimmer](https://pub.dev/packages/shimmer)
@@ -112,14 +114,15 @@ flutter pub get
     *   Create all necessary tables (Profiles, Sessions, Attendance, etc.).
     *   Set up Row Level Security (RLS) policies.
     *   Create test users and initial data.
-3.  **Storage**: File uploads are saved locally under `local_storage/` (auto-created) and served via your own HTTP endpoint. Default public base URL is `http://localhost:9000` (see `lib/core/config/storage_config.dart`). Start a static server, e.g.:
-
-```bash
-python3 -m http.server 9000 --directory local_storage
-```
+3.  **Storage (Development / Self‑hosted)**:
+    - The app uses `StorageRepository` to send file bytes to an HTTP upload API whose base URL is configured via `StorageConfig.publicBaseUrl` (e.g. `http://localhost:9000` or `https://media.your-domain.com` behind Cloudflare Tunnel).
+    - Your storage server is responsible for:
+        - Handling `POST /upload?folder=...&filename=...` and persisting files under `local_storage/...`.
+        - Serving files via `GET /...` so URLs stored in Supabase remain publicly accessible.
+    - See `documentation/cloudflare_self_host.md` for a reference setup using Python + Cloudflare Tunnel.
 4.  **App Credentials**:
     *   Enter your `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `lib/main.dart` (or your environment configuration file).
-5.  **Essential Fixes & Updates**: Run the following scripts in order to ensure correct functionality:
+5.  **Essential Fixes & Updates**: Run the following scripts in order to ensure correct functionality (most have been inlined into `dataSetUp.sql`, but keeping them helps for troubleshooting existing databases or existing Supabase projects):
     *   `supabase/fix_attendance_trigger.sql`: Fixes remaining session deduction logic.
     *   `supabase/fix_coach_shifts_fk.sql`: Fixes foreign key constraints for class deletion.
     *   `supabase/update_sessions_rls.sql`: Updates RLS to allow coaches to claim unassigned sessions.
@@ -160,9 +163,11 @@ Key data table relationships:
 *   **profiles**: User profiles (linked to auth.users)
 *   **class_groups**: Class definitions
 *   **sessions**: Specific class sessions (linked to class_groups, coaches, venues)
+*   **students**: Standalone student records (with gender, parent linkage, and aggregated stats)
 *   **attendance**: Attendance records (linked to sessions, students)
-*   **leave_requests**: Student leave requests for specific sessions (drives leave history)
+*   **leave_requests**: Student leave requests for specific sessions (drives leave history; creatable by staff or parents)
 *   **session_makeup_rights**: Makeup entitlements generated from approved leaves
+*   **session_replacements**: Actual booked makeup sessions chosen by parents for their children
 *   **coach_shifts**: Coach shift records
 *   **timeline_posts**: Timeline posts
 *   **notices**: System announcements

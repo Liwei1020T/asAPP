@@ -18,7 +18,8 @@ The Timeline feature, also known as "Moments," is a social feed where coaches ca
 
 ### 3. Content Creation (Coach/Admin)
 - **Create Post**: Compose text and attach media (images/videos).
-- **Media Upload**: Integrated file picker and upload to local storage.
+- **Media Upload**: Integrated file picker that uploads media via the `StorageRepository` to a central
+  storage server (typically your `local_storage/` directory exposed over HTTP / Cloudflare Tunnel).
 
 ## Technical Components
 
@@ -32,9 +33,11 @@ The Timeline feature, also known as "Moments," is a social feed where coaches ca
 - `TimelineRepository`:
     - `watchAllPosts`: Real-time stream of timeline posts.
     - `toggleLike`: Handles like/unlike actions.
-    - `createPost`: Publishes a new post.
+    - `createPost`: Publishes a new post (inserts into `timeline_posts`).
     - `deletePost`: Deletes a post and its likes/comments (author or admin).
-- `StorageRepository`: Handles media uploads to local disk under `local_storage/timeline/...`, returning URLs based on `StorageConfig.publicBaseUrl`.
+- `StorageRepository`: Handles media uploads by POSTing file bytes to the HTTP upload API
+  at `StorageConfig.publicBaseUrl` (e.g. `https://asp-media.li-wei.net/upload`), and returns a public URL
+  that gets stored in `timeline_posts.media_urls`.
 
 ## Data Models
 - **TimelinePost**:

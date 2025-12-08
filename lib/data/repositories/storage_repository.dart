@@ -1,20 +1,17 @@
-import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/config/storage_config.dart';
 
-/// Local filesystem storage repository (stores under `StorageConfig.baseDirectory`)
-/// and returns HTTP URLs based on `StorageConfig.publicBaseUrl`.
+/// Storage repository that uploads files to a HTTP API
+/// and returns public URLs based on [StorageConfig.publicBaseUrl].
 class StorageRepository {
-  StorageRepository({Directory? baseDirectory})
-      : _baseDir = baseDirectory ?? Directory(StorageConfig.baseDirectory);
+  StorageRepository();
 
-  final Directory _baseDir;
-
-  /// Upload file bytes/stream to local folder and return a public URL.
+  /// Upload file bytes/stream to remote server and return a public URL.
   Future<String> uploadFile({
     Uint8List? bytes,
     Stream<List<int>>? stream,
@@ -24,44 +21,57 @@ class StorageRepository {
     String? contentType,
     void Function(double progress)? onProgress,
   }) async {
-    if (kIsWeb) {
-      throw UnsupportedError('Local filesystem storage is not supported on web builds.');
-    }
     if (bytes == null && stream == null) {
       throw ArgumentError('bytes or stream must be provided');
     }
 
-    final folderPath = _normalizeFolder(folder ?? '');
-    final dir = Directory(_joinPaths(_baseDir.path, folderPath));
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    final relativePath = folderPath.isEmpty ? filename : '$folderPath/$filename';
-    final file = File(_joinPaths(_baseDir.path, relativePath));
+    final normalizedFolder = _normalizeFolder(folder ?? '');
 
     Uint8List payload;
     if (stream != null) {
-      onProgress?.call(0);
       final chunks = <int>[];
       var loaded = 0;
       await for (final chunk in stream) {
         chunks.addAll(chunk);
         loaded += chunk.length;
         if (contentLength != null && contentLength > 0) {
-          onProgress?.call((loaded / contentLength) * 0.5);
+          onProgress?.call(loaded / contentLength);
         }
-        await Future<void>.delayed(Duration.zero);
       }
       payload = Uint8List.fromList(chunks);
     } else {
       payload = bytes!;
     }
 
-    onProgress?.call(0.75);
-    await file.writeAsBytes(payload, flush: true);
+    final base = StorageConfig.publicBaseUrl.trim();
+    if (base.isEmpty) {
+      throw StateError('StorageConfig.publicBaseUrl must be configured for uploads.');
+    }
+    final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    final uri = Uri.parse('$normalizedBase/upload').replace(queryParameters: {
+      'folder': normalizedFolder,
+      'filename': filename,
+    });
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': contentType ?? 'application/octet-stream',
+      },
+      body: payload,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Upload failed: ${response.statusCode} ${response.body}');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final relativePath = (decoded['path'] as String?) ??
+        (normalizedFolder.isEmpty ? filename : '$normalizedFolder/$filename');
+
     onProgress?.call(1);
 
-    return _toPublicUrl(relativePath, file);
+    return _buildPublicUrl(relativePath);
   }
 
   /// Pre-compute the public URL before upload finishes.
@@ -69,13 +79,9 @@ class StorageRepository {
     required String filename,
     String? folder,
   }) {
-    if (kIsWeb) {
-      throw UnsupportedError('Local filesystem storage is not supported on web builds.');
-    }
     final folderPath = _normalizeFolder(folder ?? '');
     final relativePath = folderPath.isEmpty ? filename : '$folderPath/$filename';
-    final file = File(_joinPaths(_baseDir.path, relativePath));
-    return _toPublicUrl(relativePath, file);
+    return _buildPublicUrl(relativePath);
   }
 
   String _normalizeFolder(String folder) {
@@ -86,22 +92,14 @@ class StorageRepository {
     return f;
   }
 
-  String _joinPaths(String base, String next) {
-    if (next.isEmpty) return base;
-    final normalizedBase = base.replaceAll(RegExp(r'[\\/]+$'), '');
-    final normalizedNext = next.replaceAll(RegExp(r'^[\\/]+'), '');
-    return '$normalizedBase${Platform.pathSeparator}$normalizedNext';
-  }
-
-  String _toPublicUrl(String relativePath, File file) {
+  String _buildPublicUrl(String relativePath) {
     final cleaned = relativePath.replaceAll('\\', '/');
     final base = StorageConfig.publicBaseUrl.trim();
     if (base.isNotEmpty) {
       final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
       return '$normalizedBase/$cleaned';
     }
-    // Fallback to file:// if no base URL provided.
-    return file.absolute.uri.toString();
+    return cleaned;
   }
 }
 

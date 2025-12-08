@@ -25,7 +25,8 @@ The Profile feature allows users to manage their personal account information, s
     - `updatePassword`: Handles password changes.
     - `signOut`: Logs the user out.
 - `StorageRepository` (`lib/data/repositories/storage_repository.dart`):
-    - `uploadFile`: Uploads avatar images to local disk under `local_storage/`, returning URLs based on `StorageConfig.publicBaseUrl`.
+    - `uploadFile`: Uploads avatar images to the HTTP upload API at `StorageConfig.publicBaseUrl` and
+      returns a public URL (typically pointing to a file stored under `local_storage/` on the central server).
 
 ## Data Models
 - **Profile**: User profile data including `fullName`, `phoneNumber`, `avatarUrl`, and `role`.

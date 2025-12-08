@@ -49,6 +49,18 @@ The Attendance feature allows coaches and admins to manage class attendance and 
 - **Navigation**:
   - In the Admin shell side menu, there is a **“请假记录”** destination pointing to `/admin/leaves`.
 
+### 7. Parent Leave & Makeup Flow
+- **Parent Child Attendance Page**: From the Parent Dashboard, parents can open a detailed attendance page
+  for each child. For upcoming sessions that have not yet been marked, they can:
+  - Submit a **leave request** (calling `LeaveRepository.createLeaveWithMakeup`, which upserts into
+    `leave_requests` / `session_makeup_rights` and sets attendance to `leave`).
+  - See leave status (`已请假`) and, when a makeup right exists, a prompt indicating that a makeup can be booked.
+- **Makeup Booking**:
+  - Parents can choose a replacement session from a list of suitable future sessions (other time slots/classes),
+    subject to conflict checks and one booking per leave.
+  - Bookings are stored in the `session_replacements` table, linking `student_id`, `source_session_id`,
+    and `target_session_id`.
+
 
 ## Technical Components
 

@@ -20,10 +20,9 @@ The Students feature is a comprehensive management system for student profiles, 
 - **Avatar**: Upload and manage student profile pictures.
 
 ### 3. Session Tracking
-- **Balance Management**: Track Total Sessions vs. Remaining Sessions.
-- **Visual Indicators**: Progress bar showing session usage.
-- **Attendance Rate**: Calculated percentage of attended classes.
-- **Low Balance Alerts**: System identifies students with few remaining sessions.
+- **Attendance Rate**: Calculated percentage of attended classes for each student.
+- **Monthly Overview**: Parent dashboard shows per‑child attendance rate for the current month.
+- **History Drill‑down**: From the dashboard, parents can open detailed attendance/leave history per child.
 
 ## Technical Components
 
@@ -38,7 +37,8 @@ The Students feature is a comprehensive management system for student profiles, 
     - `watchStudents`: Real-time stream of student list.
     - `getStudentById`: Fetches detailed profile.
     - `createStudent` / `updateStudent`: Manages student data persistence.
-- `StorageRepository`: Handles avatar uploads to local disk under `local_storage/`, returning URLs based on `StorageConfig.publicBaseUrl`.
+- `StorageRepository`: Handles avatar uploads by sending files to the HTTP upload endpoint configured via
+  `StorageConfig.publicBaseUrl` (typically a Cloudflare‑exposed server that serves files from `local_storage/`).
 
 ## Data Models
 - **Student**:
@@ -46,6 +46,7 @@ The Students feature is a comprehensive management system for student profiles, 
     - `fullName`: Student's name.
     - `status`: Enum (active, inactive, graduated, suspended).
     - `level`: Enum (beginner, intermediate, advanced, elite).
-    - `totalSessions` / `remainingSessions`: Session balance.
+    - `attendanceRate`: Aggregated attendance percentage.
+    - `totalSessions` / `remainingSessions` *(optional/legacy)*: Fields reserved for quota/balance style billing, not shown in the current parent UI.
     - `parentName` / `emergencyPhone`: Contact details.
     - `birthDate`: Used to calculate age.
